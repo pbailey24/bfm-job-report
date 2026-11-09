@@ -151,14 +151,6 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
     <div><label>Tel. no</label><input data-k="siteTel" type="tel"></div>
     <div class="full"><label>Customer email (for sending the report)</label><input data-k="siteEmail" type="email"></div>
   </div>
-  <h3>Client / landlord / retailer</h3>
-  <div class="grid">
-    <div><label>Name</label><input data-k="cliName"></div>
-    <div><label>Company</label><input data-k="cliCo"></div>
-    <div class="full"><label>Address</label><textarea data-k="cliAddr" style="min-height:70px"></textarea></div>
-    <div><label>Post code</label><input data-k="cliPost"></div>
-    <div><label>Tel. no</label><input data-k="cliTel" type="tel"></div>
-  </div>
   <div class="full" style="margin-top:10px"><label>Fault reported on the job sheet</label><textarea data-k="reported" placeholder="Copy the fault description from the job sheet"></textarea></div>
 </div>
 </details>
@@ -300,7 +292,7 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
   <p style="margin-top:14px"><button class="btn alt" onclick="printReport()">👁 Preview report on screen</button> <button class="btn alt" onclick="emailReport()">✉️ Email without PDF</button></p>
 </div>
 </details>
-<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.7</b> · 9 Nov 2026</p>
+<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.8</b> · 9 Nov 2026</p>
 </main>
 
 <div id="previewWrap"><div id="previewBar"><span>Report preview – scroll to check it</span><button class="btn" onclick="doPrint()">🖨 Print / Save PDF</button><button class="btn alt" onclick="previewWrap.classList.remove('show')">Close</button></div><div id="report"></div></div>
@@ -459,7 +451,7 @@ function buildReport(o){
   const readings=isGas?[['Burner pressure (mbar)',o.burnPress],['Tightness test',o.tightness]]
                       :[['Earth continuity (Ω)',o.earthR],['Insulation resistance (MΩ)',o.insR],['Fuse rating (A)',o.fuse],['Rated power (kW)',o.ratedKw]];
   let h=`<div class="rp">${header(o,o.reportType,s)}
-  <div class="sec"><div class="cols3">
+  <div class="sec"><div class="cols2">
    <div><span class="h">Company / Installer</span><table>
     <tr><td>Engineer</td><td class="v">${esc(s.engName)}</td></tr><tr><td>Company</td><td class="v">${esc(s.company)}</td></tr>
     <tr><td>Address</td><td class="v">${nl(s.coAddr)}</td></tr><tr><td>Post Code</td><td class="v">${esc(s.coPost)}</td></tr>
@@ -467,9 +459,7 @@ function buildReport(o){
    <div><span class="h">Job Address</span><table>
     <tr><td>Name</td><td class="v">${esc(o.siteName)}</td></tr><tr><td>Call No.</td><td class="v">${esc(o.jobRef)}${o.callType?' ('+esc(o.callType)+')':''}</td></tr><tr><td>Address</td><td class="v">${nl(o.siteAddr)}</td></tr>
     <tr><td>Post Code</td><td class="v">${esc(o.sitePost)}</td></tr><tr><td>Tel. No</td><td class="v">${esc(o.siteTel)}</td></tr></table></div>
-   <div><span class="h">Client / Landlord</span><table>
-    <tr><td>Name</td><td class="v">${esc(o.cliName)}</td></tr><tr><td>Company</td><td class="v">${esc(o.cliCo)}</td></tr>
-    <tr><td>Address</td><td class="v">${nl(o.cliAddr)}</td></tr><tr><td>Post Code</td><td class="v">${esc(o.cliPost)}</td></tr><tr><td>Tel. No</td><td class="v">${esc(o.cliTel)}</td></tr></table></div>
+
   </div></div>
   <div class="sec"><span class="h">Appliance Details</span><div class="cols2">
    <table><tr><td>Type</td><td class="v">${esc(o.appType)}</td></tr><tr><td>Make</td><td class="v">${esc(o.appMake)}</td></tr><tr><td>Model</td><td class="v">${esc(o.appModel)}</td></tr><tr><td>Location (Position/Room)</td><td class="v">${esc(o.appLoc)}</td></tr><tr><td>Serial No.</td><td class="v">${esc(o.appSerial)}</td></tr><tr><td>Install date</td><td class="v">${esc(o.installDate)}</td></tr></table>
@@ -588,11 +578,10 @@ function parsePdfText(t){
   return common(t,r)}
 function splitAddr(a){ // put town / county on new lines where we can
   return a.replace(/\s+(?=(?:West Midlands|Staffordshire|Cheshire|Shropshire|Derbyshire|Greater Manchester|Lancashire|Yorkshire|West Yorkshire|South Yorkshire|Merseyside|Worcestershire|Warwickshire|Leicestershire|Nottinghamshire|Stoke-on-Trent|Wolverhampton|Birmingham|Stafford|Newcastle-under-Lyme)\b)/g,'\n')}
-function parseSheet(text){text=tidy(text);return /Service Job Sheet|Job Number:|Field Report/i.test(text)?parsePdfText(text):parseEmailText(text)}
+function parseSheet(text){text=tidy(text);const isEmail=/Call Information|Site Address\s*\n|Scheduled Arrival Date\/Time/i.test(text)&&!/Service Job Sheet|Job Number:|Site Name:|Serial No:/i.test(text);return isEmail?parseEmailText(text):parsePdfText(text)}
 function loadSheetText(text,src){
   if(!text||!text.trim()){sheetMsg.textContent='Nothing to read – paste the email text first.';return}
   const r=parseSheet(text);
-  if(!document.querySelector('[data-k=cliCo]').value)Object.assign(r,{cliCo:'BFM Europe Ltd',cliAddr:'Trentham Lakes\nStoke-on-Trent\nStaffordshire',cliPost:'ST4 4TJ',cliTel:'01782 339000'});
   document.querySelectorAll('.found').forEach(e=>e.classList.remove('found'));
   let n=0;for(const[k,v]of Object.entries(r)){const el=document.querySelector('#form [data-k='+k+']');if(el&&v){el.value=v;el.classList.add('found');n++}}
   job.sheetText=text.slice(0,20000);
@@ -653,11 +642,10 @@ async function genPdf(o){
     T('Date',x0+2*cw,y-9,{bold:true});T(fmtDate(o.date),x0+2*cw,y-22,{size:10,bold:true});return y-62}
 
   // ---- page 1: record ----
-  let y=header(o.reportType);const cw=(PW-2*M-16)/3;
+  let y=header(o.reportType);const cw=(PW-2*M-12)/2;
   y=section(y,yy=>{const ys=[];
     let a=bar('Company / Installer',M+4,yy);ys.push(table(M+4,a,cw-4,[['Engineer',s.engName],['Company',s.company],['Address',s.coAddr],['Post code',s.coPost],['Tel. no',s.coTel],...(isGas?[['Gas Safe Reg No.',s.gasSafe],['ID card no.',s.idCard]]:[])],.36));
-    a=bar('Job Address',M+8+cw,yy);ys.push(table(M+8+cw,a,cw-4,[['Name',o.siteName],['Call no.',(o.jobRef||'')+(o.callType?' ('+o.callType+')':'')],['Address',o.siteAddr],['Post code',o.sitePost],['Tel. no',o.siteTel]],.3));
-    a=bar('Client / Landlord',M+12+2*cw,yy);ys.push(table(M+12+2*cw,a,cw-8,[['Name',o.cliName],['Company',o.cliCo],['Address',o.cliAddr],['Post code',o.cliPost],['Tel. no',o.cliTel]],.3));
+    a=bar('Job Address',M+8+cw,yy);ys.push(table(M+8+cw,a,cw-8,[['Name',o.siteName],['Call no.',(o.jobRef||'')+(o.callType?' ('+o.callType+')':'')],['Address',o.siteAddr],['Post code',o.sitePost],['Tel. no',o.siteTel]],.3));
     return Math.min(...ys)});
   const hw=(PW-2*M-20)/2;
   y=section(y,yy=>{const a=bar('Appliance Details',M+4,yy);
