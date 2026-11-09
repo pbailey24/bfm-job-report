@@ -10,7 +10,9 @@
 body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:16px;line-height:1.4}
 header.app{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
 header.app h1{font-size:18px;margin:0;flex:1}
-header.app button{background:#fff2;color:#fff;border:1px solid #fff5;border-radius:8px;padding:8px 10px;font-size:14px}
+header.app button{background:#fff2;color:#fff;border:1px solid #fff5;border-radius:8px;padding:7px 8px;font-size:13px;white-space:nowrap}
+header.app button.clr{background:#c0262d;border-color:#c0262d}
+@media(max-width:420px){header.app h1{font-size:15px}header.app{gap:6px;padding:10px}}
 main{max-width:860px;margin:0 auto;padding:12px}
 .step{background:var(--card);border-radius:12px;margin:12px 0;box-shadow:0 1px 3px #0001;overflow:hidden}
 .step>summary{list-style:none;cursor:pointer;padding:14px 16px;font-weight:600;display:flex;align-items:center;gap:10px;font-size:17px}
@@ -108,6 +110,7 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
 
 <header class="app">
   <h1>BFM Job Report</h1>
+  <button class="clr" onclick="clearJob()">🧹 Clear</button>
   <button onclick="showJobs()">Saved jobs</button>
   <button onclick="openSettings()">My details</button>
 </header>
@@ -297,10 +300,17 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
   <p style="margin-top:14px"><button class="btn alt" onclick="printReport()">👁 Preview report on screen</button> <button class="btn alt" onclick="emailReport()">✉️ Email without PDF</button></p>
 </div>
 </details>
-<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.5</b> · 9 Nov 2026</p>
+<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.7</b> · 9 Nov 2026</p>
 </main>
 
 <div id="previewWrap"><div id="previewBar"><span>Report preview – scroll to check it</span><button class="btn" onclick="doPrint()">🖨 Print / Save PDF</button><button class="btn alt" onclick="previewWrap.classList.remove('show')">Close</button></div><div id="report"></div></div>
+
+<dialog id="clearDlg"><h2 style="margin-top:0">Clear the form?</h2>
+<p class="help">This empties every box so you can start the next job.</p>
+<div style="display:flex;flex-direction:column;gap:10px">
+<button class="btn" onclick="doClear(false)">🧹 Clear – keep a copy in Saved jobs</button>
+<button class="btn red" onclick="doClear(true)">🗑 Clear and delete this job</button>
+<button class="btn alt" onclick="clearDlg.close()">Cancel – go back</button></div></dialog>
 
 <dialog id="askDlg"><p id="askMsg" style="font-size:17px"></p><div class="row"><button class="btn" id="askYes">Yes</button><button class="btn alt" onclick="askDlg.close()">Cancel</button></div></dialog>
 
@@ -378,7 +388,7 @@ function fill(o){
   document.querySelectorAll('#form [data-k]').forEach(i=>{const v=o[i.dataset.k];if(i.type==='checkbox')i.checked=!!v;else i.value=v??''});
   document.querySelectorAll('#form .ynn').forEach(g=>g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===o[g.dataset.y])));
   setFuel(o.fuel||'gas');setCls(o.cls||'');photos=o.photos||[];drawPhotos();
-  loadSig('sigEng',o.sigEng);loadSig('sigCust',o.sigCust);syncWarn();
+  loadSig('sigEng',o.sigEng);loadSig('sigCust',o.sigCust);syncWarn();setTimeout(growAll,0);
 }
 
 // fuel toggle
@@ -415,15 +425,22 @@ function sigData(id){return sigs[id].isBlank()?'':sigs[id].c.toDataURL('image/pn
 function loadSig(id,d){clearSig(id);if(!d)return;const s=sigs[id],i=new Image();i.onload=()=>{s.ctx.drawImage(i,0,0,s.c.width,s.c.height);s.setBlank(false)};i.src=d}
 
 // ---------- jobs ----------
-function saveJob(show){job=collect();const all=store.get('bfm_jobs',{});all[job.id]=job;store.set('bfm_jobs',all);if(show)toast('Job saved')}
+function saveJob(show){job=collect();if(hasContent(job)){const all=store.get('bfm_jobs',{});all[job.id]=job;store.set('bfm_jobs',all);store.set('bfm_cur',{id:job.id})}else store.set('bfm_cur',{draft:job});if(show)toast(hasContent(job)?'Job saved':'Nothing to save yet')}
 function ask(m,cb){askMsg.textContent=m;askYes.onclick=()=>{askDlg.close();cb()};askDlg.showModal()}
-function newJob(){ask('Start a new job? This one will be saved first.',()=>{saveJob(false);startBlank();toast('New job started')})}
-function startBlank(){madePdf=null;pdfActions&&pdfActions.classList.add('hidden');pdfMsg&&(pdfMsg.textContent='');const s=S();job={};document.querySelectorAll('.found').forEach(e=>e.classList.remove('found'));sheetMsg.textContent='';fill({date:new Date().toISOString().slice(0,10),certNo:s.nextCert,reportType:'Gas Breakdown Record'});
+function hasContent(o){return!!(o.siteName||o.jobRef||o.comments||o.siteAddr||o.appMake||o.sigEng||(o.photos&&o.photos.length))}
+function clearJob(){clearDlg.showModal()}
+function doClear(del){clearDlg.close();const cur=collect();
+  const all=store.get('bfm_jobs',{});
+  if(del||!hasContent(cur)){delete all[cur.id];store.set('bfm_jobs',all)}else{all[cur.id]=cur;store.set('bfm_jobs',all)}
+  const reuse=!hasContent(cur)||del;startBlank(reuse?cur.certNo:null);saveJob(false);window.scrollTo(0,0);toast(del?'Job deleted – form cleared':'Form cleared')}
+function newJob(){ask('Start a new job? This one will be saved first.',()=>{saveJob(false);startBlank();saveJob(false);toast('New job started')})}
+function startBlank(reuseCert){madePdf=null;pdfActions&&pdfActions.classList.add('hidden');pdfMsg&&(pdfMsg.textContent='');const s=S();job={};document.querySelectorAll('.found').forEach(e=>e.classList.remove('found'));sheetMsg.textContent='';if(reuseCert){fill({date:new Date().toISOString().slice(0,10),certNo:reuseCert,reportType:'Gas Breakdown Record'});return}
+  fill({date:new Date().toISOString().slice(0,10),certNo:s.nextCert,reportType:'Gas Breakdown Record'});
   s.nextCert=String((parseInt(s.nextCert)||1000)+1);store.set('bfm_settings',s);window.scrollTo(0,0)}
-function showJobs(){saveJob(false);const all=Object.values(store.get('bfm_jobs',{})).sort((a,b)=>b.saved.localeCompare(a.saved));
+function showJobs(){saveJob(false);const all=Object.values(store.get('bfm_jobs',{})).filter(hasContent).sort((a,b)=>b.saved.localeCompare(a.saved));
   joblist.innerHTML=all.length?all.map(j=>`<div class="job"><div><b>Cert ${esc(j.certNo)}</b> ${j.unsafe?'<span class="tag r">UNSAFE</span>':''}<span class="tag">${j.fuel==='elec'?'Electric':'Gas'}</span><br>${esc(j.siteName)} ${esc(j.sitePost)}<br><small>${esc(j.date)} · ${esc(j.appMake)} ${esc(j.appModel)}</small></div><button class="btn alt" onclick="openJob('${j.id}')">Open</button><button class="btn red" onclick="delJob('${j.id}')">🗑</button></div>`).join(''):'<p>No saved jobs yet.</p>';
   jobsDlg.showModal()}
-function openJob(id){const j=store.get('bfm_jobs',{})[id];if(!j)return;job=j;fill(j);jobsDlg.close();toast('Job opened')}
+function openJob(id){const j=store.get('bfm_jobs',{})[id];if(!j)return;job=j;fill(j);store.set('bfm_cur',{id});jobsDlg.close();toast('Job opened')}
 function delJob(id){jobsDlg.close();ask('Delete this job? This cannot be undone.',()=>{const all=store.get('bfm_jobs',{});delete all[id];store.set('bfm_jobs',all);if(job.id===id)job={};showJobs()})}
 setInterval(()=>saveJob(false),30000);
 
@@ -536,17 +553,33 @@ function parseEmailText(t){
   return common(t,r)}
 function parsePdfText(t){
   const r={};t=t.replace(/\s+/g,' ');let m;
-  m=t.match(/Job Number:?\s*(\d{4,6})/i)||t.match(/\b(\d{5})\b/);if(m)r.jobRef=m[1];
-  m=t.match(/\b([A-Z]{1,2})\s+(WAR|CHG|CHA|SER|INS|REC)\s+(OPEN|CLOSED|COMPLETE\w*|ALLOCATED|PENDING)\b/);if(m)r.callType=CALLTYPES[m[2]]||m[2];
-  m=t.match(/\b(?:OPEN|CLOSED|COMPLETE\w*|ALLOCATED|PENDING)\s+(.+?)\s+\d{2}\/\d{2}\/\d{4}/);if(m)r.siteName=fixCase(m[1].trim());
-  m=t.match(/Site Name:?\s*(.+?)\s*([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);
-  if(m){r.siteAddr=m[1].trim();r.sitePost=m[2]}
-  else{m=t.match(/Address:?\s*(.+?)\s*([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);if(m){r.siteAddr=m[1].replace(/Site Name:?/,'').trim();r.sitePost=m[2]}}
+  const PC='([A-Z]{1,2}\\d[A-Z\\d]?\\s*\\d[A-Z]{2})\\b';
+  // job number
+  m=t.match(/Job Number:?\s*(\d{4,6})\b/i)||t.match(/Address:?\s*(\d{4,6})\s/)||t.match(/\b(\d{5})\b/);if(m)r.jobRef=m[1];
+  // call type
+  m=t.match(/Call Type:?\s*(WAR|CHG|CHA|SER|INS|REC)\b/)||t.match(/\b[A-Z]{1,2}\s+(WAR|CHG|CHA|SER|INS|REC)\s+(?:OPEN|CLOSED|COMPLETE\w*|ALLOCATED|PENDING)\b/);
+  if(m)r.callType=CALLTYPES[m[1]]||m[1];
+  // name + address: layout copied from PDF on a PC ("Address: 34787 NAME 73 Street Town County POSTCODE")
+  m=t.match(new RegExp('Address:?\\s*\\d{4,6}\\s+(.+?)\\s+'+PC));
+  if(m){const words=m[1].split(' ');let i=0;while(i<words.length&&/^[A-Z][A-Z&.'-]*$/.test(words[i])&&words[i].length>1||(i<words.length&&/^(MR|MRS|MS|MISS|DR|&)$/.test(words[i])))i++;
+    if(i>0&&i<words.length){r.siteName=fixCase(words.slice(0,i).join(' '));r.siteAddr=words.slice(i).join(' ')}else r.siteAddr=m[1];r.sitePost=m[2]}
+  // other layout ("OPEN NAME dd/mm/yyyy ... Site Name: address POSTCODE")
+  if(!r.siteName){m=t.match(/\b(?:OPEN|CLOSED|COMPLETE\w*|ALLOCATED|PENDING)\s+([^:]+?)\s+\d{2}\/\d{2}\/\d{4}/);if(m&&m[1].length<60)r.siteName=fixCase(m[1].trim())}
+  if(!r.siteAddr){m=t.match(new RegExp('Site Name:?\\s*([^:]+?)\\s*'+PC))||t.match(new RegExp('Address:?\\s*([^:]+?)\\s*'+PC));
+    if(m){r.siteAddr=m[1].replace(/Site Name:?/,'').trim();r.sitePost=m[2]}}
   if(r.siteAddr&&r.siteName&&r.siteAddr.toUpperCase().startsWith(r.siteName.toUpperCase()))r.siteAddr=r.siteAddr.slice(r.siteName.length).trim();
   if(r.siteAddr)r.siteAddr=splitAddr(r.siteAddr);
-  m=t.match(/Call Details\s*(.+?)\s*(?:Problem:|Engineer Name:|Serial No:|Product:)/i);if(m)r.reported=m[1].trim();
-  m=t.match(/\b([A-Z0-9]{5,12})\s+-\s+([A-Z0-9][A-Z0-9 &\/.'-]{2,40}?)\s+(?=Product:|Serial No|Scheduled|Install|Engineer|$)/)||t.match(/Product:\s*([A-Z0-9]{5,12})\s+-\s+([A-Z0-9][A-Z0-9 &\/.'-]{2,40}?)(?=\s+[A-Z][a-z]|\s+\w+:|$)/);
-  if(m){const name=m[2].trim().split(' ');r.appMake=titleCase(name.shift());r.appModel=(name.join(' ')+' ('+m[1]+')').trim();r.productCode=m[1]}
+  // product (make / model)
+  const pm=/\b([A-Z0-9]{5,12})\s+-\s+([A-Z0-9][A-Z0-9&\/.'-]*(?:\s+[A-Z0-9][A-Z0-9&\/.'-]*)*?)(?=\s+[A-Z][a-z]|\s+\w+:|\s*$)/.exec(t);
+  if(pm){const name=pm[2].trim().split(' ');r.appMake=titleCase(name.shift());r.appModel=(name.join(' ')+' ('+pm[1]+')').trim();r.productCode=pm[1]}
+  // fault reported: just the problem text
+  const STOP=/\s*(?:Scheduled Arrival|Date Attended|Job Notes|Field Report|Problem:|Description\s+Charge|Customer Acceptance)/i;
+  let rep='';
+  if(pm){let after=t.slice(pm.index+pm[0].length);const k=after.search(STOP);if(k>=0)after=after.slice(0,k);
+    after=after.replace(/\b(?:Engineer Name|Product|Serial No|Install Date):?/g,' ').replace(/\s+/g,' ').trim();if(after.length>10)rep=after}
+  if(!rep){m=t.match(/Call Details\s*(.+?)\s*(?:Problem:|Engineer Name:|Serial No:|Product:)/i);if(m&&!/Call Type:|Status:/.test(m[1]))rep=m[1].trim()}
+  if(rep)r.reported=rep;
+  // serial
   const cands=[];let re=/([A-Z0-9]{5,})\s+Serial No/g,x;while((x=re.exec(t)))cands.push(x[1]);
   re=/Serial No:?\s*([A-Z0-9]{5,})/g;while((x=re.exec(t)))cands.push(x[1]);
   const ser=cands.find(c=>c!==r.productCode&&(c.match(/\d/g)||[]).length>=c.length/2);if(ser)r.appSerial=ser;
@@ -564,7 +597,7 @@ function loadSheetText(text,src){
   let n=0;for(const[k,v]of Object.entries(r)){const el=document.querySelector('#form [data-k='+k+']');if(el&&v){el.value=v;el.classList.add('found');n++}}
   job.sheetText=text.slice(0,20000);
   sheetMsg.innerHTML=n?`✅ Filled in <b>${n}</b> boxes${src?' from '+esc(src):''}. Check the yellow ones are right.`:'⚠️ Couldn\'t find the job details in that. Try the other way (PDF or paste), or type them in.';
-  pasteBox.classList.add('hidden');pasteTxt.value='';saveJob(false)}
+  pasteBox.classList.add('hidden');pasteTxt.value='';growAll();saveJob(false)}
 let pdfjs=null;
 async function getPdfJs(){if(pdfjs)return pdfjs;globalThis.pdfjsWorker=await import(PDFJS_BASE+'pdf.worker.min.mjs');pdfjs=await import(PDFJS_BASE+'pdf.min.mjs');return pdfjs}
 sheetIn.onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;sheetMsg.textContent='Reading '+f.name+'…';
@@ -699,9 +732,12 @@ async function sharePdf(){if(!madePdf)return;const o=job;
   try{await navigator.share({files:[madePdf],title:mailSubject(o),text})}
   catch(e){if(e&&e.name!=='AbortError')pdfMsg.innerHTML+='<br>⚠️ Sharing didn\'t work here – use Download PDF instead.'}}
 
+function grow(el){el.style.height='auto';el.style.height=Math.max(el.scrollHeight+2,70)+'px'}
+document.querySelectorAll('#form textarea').forEach(el=>el.addEventListener('input',()=>grow(el)));
+function growAll(){document.querySelectorAll('#form textarea').forEach(grow)}
 // ---------- start ----------
-(function(){const all=store.get('bfm_jobs',{}),last=Object.values(all).sort((a,b)=>b.saved.localeCompare(a.saved))[0];
-  if(last){job=last;fill(last)}else startBlank();
+(function(){const all=store.get('bfm_jobs',{}),cur=store.get('bfm_cur',null),last=Object.values(all).sort((a,b)=>b.saved.localeCompare(a.saved))[0];
+  if(cur&&cur.draft){job=cur.draft;fill(cur.draft)}else if(cur&&cur.id&&all[cur.id]){job=all[cur.id];fill(job)}else if(last){job=last;fill(last)}else{startBlank();saveJob(false)}
   if(!S().gasSafe)setTimeout(()=>toast('Tap “My details” to add your Gas Safe number'),800)})();
 </script>
 </body>
