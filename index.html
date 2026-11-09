@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BFM Job Report</title>
+<style>
+:root{--navy:#1f3b57;--navy2:#2c5378;--bg:#eef1f4;--card:#fff;--line:#c9d1d9;--txt:#1b2733;--muted:#5d6b78;--red:#c0262d;--amber:#d98a00;--green:#2f7d3b}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--txt);font-size:16px;line-height:1.4}
+header.app{background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+header.app h1{font-size:18px;margin:0;flex:1}
+header.app button{background:#fff2;color:#fff;border:1px solid #fff5;border-radius:8px;padding:8px 10px;font-size:14px}
+main{max-width:860px;margin:0 auto;padding:12px}
+.step{background:var(--card);border-radius:12px;margin:12px 0;box-shadow:0 1px 3px #0001;overflow:hidden}
+.step>summary{list-style:none;cursor:pointer;padding:14px 16px;font-weight:600;display:flex;align-items:center;gap:10px;font-size:17px}
+.step>summary::-webkit-details-marker{display:none}
+.num{background:var(--navy);color:#fff;border-radius:50%;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:none}
+.step .body{padding:4px 16px 16px}
+.help{background:#f3f7fb;border-left:4px solid var(--navy2);padding:8px 12px;margin:0 0 12px;color:var(--muted);font-size:14px;border-radius:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:3px;font-weight:600}
+input,select,textarea{width:100%;font:inherit;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+textarea{min-height:90px;resize:vertical}
+.full{grid-column:1/-1}
+.ynn{display:flex;gap:6px}
+.ynn button{flex:1;padding:9px 0;border:1px solid var(--line);background:#fff;border-radius:8px;font:inherit;font-size:14px}
+.ynn button.on[data-v=Yes]{background:var(--green);color:#fff;border-color:var(--green)}
+.ynn button.on[data-v=No]{background:var(--red);color:#fff;border-color:var(--red)}
+.ynn button.on[data-v=NA]{background:#7a8691;color:#fff;border-color:#7a8691}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{background:var(--navy);color:#fff;border:0;border-radius:10px;padding:13px 18px;font:inherit;font-weight:600}
+.btn.alt{background:#fff;color:var(--navy);border:2px solid var(--navy)}
+.btn.red{background:var(--red)}
+.tog{display:flex;gap:8px}
+.tog button{flex:1;padding:12px;border:2px solid var(--line);background:#fff;border-radius:10px;font:inherit;font-weight:600}
+.tog button.on{border-color:var(--navy);background:var(--navy);color:#fff}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #eef}
+.chk input{width:22px;height:22px;flex:none;margin-top:1px}
+.chk span{font-size:15px}
+.warnbox{border:2px solid var(--red);border-radius:10px;padding:12px;background:#fff5f5}
+.sig{border:2px dashed var(--line);border-radius:8px;background:#fff;width:100%;height:150px;touch-action:none;display:block}
+.photos{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.photos div{position:relative}
+.photos img{width:110px;height:110px;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
+.photos button{position:absolute;top:2px;right:2px;background:#000a;color:#fff;border:0;border-radius:50%;width:24px;height:24px}
+.actions{position:sticky;bottom:0;background:#eef1f4ee;padding:10px 0;display:flex;gap:10px;flex-wrap:wrap}
+.actions .btn{flex:1;min-width:140px}
+#joblist .job{background:#fff;border-radius:10px;padding:12px;margin:8px 0;display:flex;gap:10px;align-items:center}
+#joblist .job div{flex:1}
+.tag{font-size:12px;padding:2px 8px;border-radius:10px;background:#dfe6ec;margin-left:6px}
+.tag.r{background:var(--red);color:#fff}
+.hidden{display:none!important}
+.loadbox{border:2px solid var(--navy2);border-radius:12px;padding:12px;background:#f3f7fb;margin-bottom:14px}
+.loadbox h3{margin:0 0 6px;font-size:17px}
+input.found,textarea.found,select.found{background:#fff7cc;border-color:#d9b400}
+dialog{border:0;border-radius:12px;max-width:600px;width:94%}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1b2733;color:#fff;padding:10px 16px;border-radius:20px;z-index:99;font-size:14px}
+
+/* ---------- REPORT (print) ---------- */
+#report{display:none}
+#previewWrap{display:none;position:fixed;inset:0;background:#556;z-index:50;overflow:auto}
+#previewWrap.show{display:block}
+#previewBar{position:sticky;top:0;left:0;background:var(--navy);color:#fff;padding:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;z-index:2}
+#previewBar span{flex:1;font-size:14px}
+#previewWrap #report{display:block;background:#fff;width:1080px;margin:12px;padding:14px}
+#previewWrap .rp{border-bottom:3px dashed #99a;padding-bottom:12px;margin-bottom:12px}
+@media print{
+  @page{size:A4 landscape;margin:8mm}
+  body{background:#fff;font-size:10px}
+  header.app,main,.toast,dialog,#previewBar{display:none!important}
+  #report{display:block!important}
+  #previewWrap{position:static;display:block!important;background:#fff;overflow:visible}
+  #previewWrap #report{width:auto;margin:0;padding:0}
+  #previewWrap .rp{border:0;padding:0;margin:0}
+}
+.rp{font-family:Arial,Helvetica,sans-serif;font-size:8.5px;color:#000;width:100%;page-break-after:always;break-after:page}
+.rp:last-child{page-break-after:auto;break-after:auto}
+.rp .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
+.rp .brand{font-weight:800;font-size:15px;color:#1f3b57;width:200px}
+.rp .brand small{display:block;font-weight:400;font-size:8.5px;color:#444}
+.rp .title{border:1px solid #888;background:#e6e6e6;padding:5px 40px;font-size:15px;font-weight:700}
+.rp .cert{width:200px;text-align:right}
+.rp .cert b{border:1px solid #888;padding:1px 8px;background:#eee}
+.rp .sec{background:#e6e6e6;border:1px solid #bbb;margin-top:3px;padding:2px 5px 4px}
+.rp .h{display:inline-block;background:#1f3b57;color:#fff;padding:1px 6px;font-size:10.5px;margin-bottom:3px}
+.rp table{width:100%;border-collapse:collapse}
+.rp td{padding:0 4px;vertical-align:top;line-height:1.25}
+.rp td.v{background:#fff;border:1px solid #ddd;min-width:60px}
+.rp .cols3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.rp .cols2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rp .box{background:#fff;border:1px solid #000;min-height:28px;padding:3px 5px;white-space:pre-wrap}
+.rp .sigimg{height:30px;max-width:150px;background:#fff;border:1px solid #ddd}
+.rp .small{font-size:8px}
+.rp .warnhead{background:#c0262d;color:#fff;text-align:center;padding:6px;font-size:16px;font-weight:800;letter-spacing:.5px}
+.rp .warnhead small{display:block;font-size:11px;font-weight:600}
+.rp .cls{display:flex;gap:8px;margin:4px 0}
+.rp .cls div{flex:1;border:1px solid #000;padding:4px;background:#fff}
+.rp .cls div.on{background:#ffd9d9;border:2px solid #c0262d;font-weight:700}
+.rp .tick{display:inline-block;width:10px;height:10px;border:1px solid #000;margin-right:4px;text-align:center;line-height:9px;font-size:9px;vertical-align:-1px}
+.rp .phgrid{display:flex;flex-wrap:wrap;gap:8px}
+.rp .phgrid img{width:62mm;height:47mm;object-fit:cover;border:1px solid #888}
+.rp .notice{border:1px solid #000;background:#fff;padding:5px;margin-top:4px}
+</style>
+</head>
+<body>
+
+<header class="app">
+  <h1>BFM Job Report</h1>
+  <button onclick="showJobs()">Saved jobs</button>
+  <button onclick="openSettings()">My details</button>
+</header>
+
+<main id="form">
+
+<details class="step" open>
+<summary><span class="num">1</span> Job details</summary>
+<div class="body">
+  <div class="loadbox">
+    <h3>📥 Load the job sheet</h3>
+    <p class="help" style="margin-bottom:8px">Choose the <b>Call … Details.pdf</b> from the BGS email, <b>or</b> copy the email text and paste it in. The boxes fill in by themselves and turn <span style="background:#fff7cc;padding:0 4px">yellow</span> – check them.</p>
+    <div class="row">
+      <label class="btn" style="margin:0;color:#fff;font-size:16px">📄 Choose job sheet PDF<input type="file" accept="application/pdf,.pdf" id="sheetIn" class="hidden"></label>
+      <button class="btn alt" type="button" onclick="pasteBox.classList.toggle('hidden')">📋 Paste email text</button>
+    </div>
+    <div id="pasteBox" class="hidden" style="margin-top:10px">
+      <textarea id="pasteTxt" placeholder="Open the job email, select all the text, copy it, then paste it here"></textarea>
+      <div class="row" style="margin-top:6px"><button class="btn" type="button" onclick="loadSheetText(pasteTxt.value)">Read it</button></div>
+    </div>
+    <div id="sheetMsg" style="margin-top:8px;font-size:14px"></div>
+  </div>
+  <p class="help">Check or fill in the job details. The certificate number goes up by one automatically for each new job.</p>
+  <div class="grid">
+    <div><label>Report type</label>
+      <select data-k="reportType"><option>Gas Breakdown Record</option><option>Gas Service Record</option><option>Electric Fire Breakdown Record</option><option>Electric Fire Service Record</option><option>Disconnection Report</option></select></div>
+    <div><label>Cert. No.</label><input data-k="certNo"></div>
+    <div><label>Date</label><input type="date" data-k="date"></div>
+    <div><label>BFM job / call number</label><input data-k="jobRef" placeholder="e.g. 34787"></div>
+    <div><label>Call type</label><input data-k="callType" placeholder="e.g. Warranty"></div>
+    <div><label>Appointment</label><input data-k="appt"></div>
+  </div>
+  <h3>Job address (where the appliance is)</h3>
+  <div class="grid">
+    <div class="full"><label>Name</label><input data-k="siteName"></div>
+    <div class="full"><label>Address</label><textarea data-k="siteAddr" style="min-height:70px"></textarea></div>
+    <div><label>Post code</label><input data-k="sitePost"></div>
+    <div><label>Tel. no</label><input data-k="siteTel" type="tel"></div>
+    <div class="full"><label>Customer email (for sending the report)</label><input data-k="siteEmail" type="email"></div>
+  </div>
+  <h3>Client / landlord / retailer</h3>
+  <div class="grid">
+    <div><label>Name</label><input data-k="cliName"></div>
+    <div><label>Company</label><input data-k="cliCo"></div>
+    <div class="full"><label>Address</label><textarea data-k="cliAddr" style="min-height:70px"></textarea></div>
+    <div><label>Post code</label><input data-k="cliPost"></div>
+    <div><label>Tel. no</label><input data-k="cliTel" type="tel"></div>
+  </div>
+  <div class="full" style="margin-top:10px"><label>Fault reported on the job sheet</label><textarea data-k="reported" placeholder="Copy the fault description from the job sheet"></textarea></div>
+</div>
+</details>
+
+<details class="step" open>
+<summary><span class="num">2</span> Appliance</summary>
+<div class="body">
+  <p class="help">Pick gas or electric first. The test questions in step 3 change to match.</p>
+  <div class="tog" id="fuelTog">
+    <button data-fuel="gas" class="on">🔥 Gas fire / stove</button>
+    <button data-fuel="elec">⚡ Electric fire</button>
+  </div>
+  <div class="grid" style="margin-top:12px">
+    <div><label>Type</label><input data-k="appType" list="types" placeholder="Fire, stove, insert…"></div>
+    <div><label>Make</label><input data-k="appMake"></div>
+    <div><label>Model</label><input data-k="appModel"></div>
+    <div><label>Location (position / room)</label><input data-k="appLoc" placeholder="Lounge"></div>
+    <div><label>Serial no.</label><input data-k="appSerial"></div>
+    <div><label>Install date</label><input data-k="installDate"></div>
+    <div class="gasOnly"><label>Flue type</label><select data-k="flueType"><option></option><option>Open flue (class 1)</option><option>Pre-cast flue</option><option>Flexible liner</option><option>Balanced flue</option><option>Power flue</option><option>Flueless</option><option>Other</option></select></div>
+  </div>
+  <datalist id="types"><option>Gas fire</option><option>Stove</option><option>Inset fire</option><option>Hole-in-the-wall fire</option><option>Wall-hung fire</option><option>Electric fire</option><option>Electric stove</option><option>Electric suite</option></datalist>
+</div>
+</details>
+
+<details class="step" open>
+<summary><span class="num">3</span> Tests & safety checks</summary>
+<div class="body">
+  <div id="gasChecks">
+    <p class="help">Tap Yes / No / N/A for each one and put in the readings you took.</p>
+    <div class="grid">
+      <div><label>Operating pressure (mbar)</label><input data-k="opPress" inputmode="decimal"></div>
+      <div><label>Burner pressure (mbar)</label><input data-k="burnPress" inputmode="decimal"></div>
+      <div><label>Tightness test</label><select data-k="tightness"><option></option><option>Pass</option><option>Fail</option><option>Not done</option></select></div>
+    </div>
+    <div id="gasYnn" style="margin-top:8px"></div>
+  </div>
+  <div id="elecChecks" class="hidden">
+    <p class="help">Tap Yes / No / N/A for each one and put in your test readings.</p>
+    <div class="grid">
+      <div><label>Earth continuity (Ω)</label><input data-k="earthR" inputmode="decimal"></div>
+      <div><label>Insulation resistance (MΩ)</label><input data-k="insR" inputmode="decimal"></div>
+      <div><label>Fuse rating (A)</label><input data-k="fuse" inputmode="decimal"></div>
+      <div><label>Rated power (kW)</label><input data-k="ratedKw" inputmode="decimal"></div>
+    </div>
+    <div id="elecYnn" style="margin-top:8px"></div>
+  </div>
+</div>
+</details>
+
+<details class="step" open>
+<summary><span class="num">4</span> Fault found & work done</summary>
+<div class="body">
+  <div id="bdYnn"></div>
+  <div class="grid" style="margin-top:8px">
+    <div><label>Location of fault</label><select data-k="faultLoc"><option></option><option>Appliance</option><option>Flue</option><option>Ventilation</option><option>Gas supply / pipework</option><option>Electrical supply</option><option>Controls</option><option>No fault found</option></select></div>
+    <div><label>Parts fitted (list)</label><input data-k="partsList" placeholder="e.g. Engine, thermocouple"></div>
+    <div class="full"><label>Fault found / work carried out</label><textarea data-k="workDone"></textarea></div>
+    <div class="full"><label>Parts required (if any)</label><input data-k="partsReq"></div>
+  </div>
+</div>
+</details>
+
+<details class="step" open>
+<summary><span class="num">5</span> Advice & is it safe?</summary>
+<div class="body">
+  <div id="advYnn"></div>
+  <p class="help" style="margin-top:12px">If the appliance is <b>not safe</b>, tick the box below. A red warning / advice notice page is added to the report.</p>
+  <label class="chk"><input type="checkbox" data-k="unsafe" id="unsafeChk"><span><b>Appliance is unsafe – add Danger / Warning Notice</b></span></label>
+  <div id="warnPart" class="warnbox hidden">
+    <label>Classification</label>
+    <div class="tog" id="clsTog" style="margin-bottom:10px">
+      <button data-cls="ID">Immediately Dangerous</button>
+      <button data-cls="AR">At Risk</button>
+      <button data-cls="NCS">Not to Current Standards</button>
+    </div>
+    <label>Reason it is unsafe</label>
+    <textarea data-k="unsafeReason" placeholder="What is wrong and why"></textarea>
+    <div style="margin-top:10px">
+      <label class="chk"><input type="checkbox" data-k="actOff"><span>Appliance turned off</span></label>
+      <label class="chk"><input type="checkbox" data-k="actDisc"><span>Appliance disconnected and gas supply capped / electrical supply isolated</span></label>
+      <label class="chk"><input type="checkbox" data-k="actLabel"><span>Warning label attached to appliance</span></label>
+      <label class="chk"><input type="checkbox" data-k="actExplained"><span>Situation explained to the responsible person and notice left</span></label>
+      <label class="chk"><input type="checkbox" data-k="actRefused"><span>Responsible person refused permission to make safe</span></label>
+      <label class="chk"><input type="checkbox" data-k="actEsp"><span>Reported to the Gas Emergency Service (0800 111 999)</span></label>
+      <label class="chk"><input type="checkbox" data-k="actRiddor"><span>RIDDOR report needed / made</span></label>
+    </div>
+  </div>
+</div>
+</details>
+
+<details class="step" open>
+<summary><span class="num">6</span> Engineer comments & photos</summary>
+<div class="body">
+  <p class="help">Write as you would to the customer or office. On a phone you can use the microphone on the keyboard to speak your notes.</p>
+  <textarea data-k="comments" style="min-height:140px"></textarea>
+  <div class="row" style="margin-top:10px">
+    <label class="btn alt" style="margin:0;color:var(--navy);font-size:16px">📷 Add photos<input type="file" accept="image/*" multiple id="photoIn" class="hidden"></label>
+  </div>
+  <div class="photos" id="photoList"></div>
+</div>
+</details>
+
+<details class="step" open>
+<summary><span class="num">7</span> Signatures</summary>
+<div class="body">
+  <p class="help">Sign with your finger. Tap “Clear” to start again.</p>
+  <label>Engineer signature</label>
+  <canvas class="sig" id="sigEng"></canvas>
+  <div class="row" style="margin:6px 0 14px"><button class="btn alt" onclick="clearSig('sigEng')">Clear</button></div>
+  <div class="grid">
+    <div><label>Customer / responsible person name</label><input data-k="custName"></div>
+    <div><label>Customer not present?</label><select data-k="custAbsent"><option value="">Present</option><option>Customer not present</option><option>Customer refused to sign</option></select></div>
+  </div>
+  <label style="margin-top:10px">Customer signature</label>
+  <canvas class="sig" id="sigCust"></canvas>
+  <div class="row" style="margin-top:6px"><button class="btn alt" onclick="clearSig('sigCust')">Clear</button></div>
+</div>
+</details>
+
+<details class="step" open>
+<summary><span class="num">8</span> Save, print & send</summary>
+<div class="body">
+  <p class="help">
+    <b>To get a PDF:</b> tap “Report / PDF” to check it, then “Print / Save PDF” and choose <b>Save as PDF</b> (on iPhone: Share → Print → pinch out → Share; on Android/PC: Print → Save as PDF).<br>
+    <b>To send it:</b> tap “Email”. Your email app opens with the details filled in. Attach the PDF you just saved.
+  </p>
+  <div class="actions">
+    <button class="btn" onclick="saveJob(true)">💾 Save job</button>
+    <button class="btn" onclick="printReport()">📄 Report / PDF</button>
+    <button class="btn alt" onclick="emailReport()">✉️ Email</button>
+    <button class="btn red" onclick="newJob()">➕ New job</button>
+  </div>
+</div>
+</details>
+<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.3</b> · 9 Nov 2026</p>
+</main>
+
+<div id="previewWrap"><div id="previewBar"><span>Report preview – scroll to check it</span><button class="btn" onclick="doPrint()">🖨 Print / Save PDF</button><button class="btn alt" onclick="previewWrap.classList.remove('show')">Close</button></div><div id="report"></div></div>
+
+<dialog id="askDlg"><p id="askMsg" style="font-size:17px"></p><div class="row"><button class="btn" id="askYes">Yes</button><button class="btn alt" onclick="askDlg.close()">Cancel</button></div></dialog>
+
+<dialog id="mailDlg"><h2>Email details</h2><p class="help">If your email app didn't open, copy these into a new email and attach the PDF.</p>
+<label>To</label><input id="mTo"><label style="margin-top:8px">Subject</label><input id="mSubj"><label style="margin-top:8px">Message</label><textarea id="mBody" style="min-height:180px"></textarea>
+<div class="row" style="margin-top:10px"><button class="btn" onclick="copyMail()">Copy message</button><a class="btn alt" id="mLink" style="text-decoration:none">Open email app</a><button class="btn alt" onclick="mailDlg.close()">Close</button></div></dialog>
+
+<dialog id="settingsDlg">
+  <h2>My details</h2>
+  <p class="help">These go on every report in the Company / Installer box. They're saved on this device only.</p>
+  <div class="grid">
+    <div><label>Engineer name</label><input data-s="engName"></div>
+    <div><label>Company</label><input data-s="company"></div>
+    <div class="full"><label>Address</label><textarea data-s="coAddr" style="min-height:70px"></textarea></div>
+    <div><label>Post code</label><input data-s="coPost"></div>
+    <div><label>Tel. no</label><input data-s="coTel"></div>
+    <div><label>Gas Safe reg no.</label><input data-s="gasSafe"></div>
+    <div><label>Gas Safe ID card no.</label><input data-s="idCard"></div>
+    <div><label>Next cert. no.</label><input data-s="nextCert" inputmode="numeric"></div>
+    <div><label>Always send copy to (office email)</label><input data-s="officeEmail" type="email"></div>
+  </div>
+  <div class="row" style="margin-top:14px"><button class="btn" onclick="saveSettings()">Save</button><button class="btn alt" onclick="settingsDlg.close()">Cancel</button></div>
+</dialog>
+
+<dialog id="jobsDlg">
+  <h2>Saved jobs</h2>
+  <p class="help">Jobs are kept on this phone or computer. Tap “Open” to carry on with one.</p>
+  <div id="joblist"></div>
+  <div class="row" style="margin-top:10px"><button class="btn alt" onclick="jobsDlg.close()">Close</button></div>
+</dialog>
+
+<script>
+// ---------- storage (safe wrappers) ----------
+const mem={};
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return k in mem?mem[k]:d}},
+             set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){mem[k]=v}}};
+function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2200)}
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const nl=s=>esc(s).replace(/\n/g,'<br>');
+
+// ---------- Yes/No/NA question sets ----------
+const Q={
+ gas:[['opCorrect','Appliance is operating correctly'],['conforms','Appliance conforms to current safety standards'],['flueSafe','Appliance flueing is safe'],['ventSafe','Appliance ventilation is safe'],['spillage','Flue flow / spillage test passed'],['burnerOk','Burner pressure correct'],['controls','Appliance / system controls checked / adjusted'],['noticeLeft','Safety warning / advice notice explained and left']],
+ elec:[['visual','Visual inspection satisfactory'],['plugCable','Plug, cable and connections satisfactory'],['earthOk','Earth continuity test passed'],['insOk','Insulation resistance test passed'],['polarity','Polarity correct'],['opCorrectE','Appliance operating correctly'],['controlsE','Thermostat / controls checked'],['clearances','Clearances to combustibles satisfactory'],['noticeLeftE','Safety warning / advice notice explained and left']],
+ bd:[['partFitted','Part fitted'],['faultResolved','Fault resolved'],['partsNeeded','Parts required']],
+ adv:[['isSafe','Appliance is safe'],['replaceRec','Recommended appliance replacement – see advice'],['improveRec','System improvement(s) recommended – see advice'],['partsAvail','All functional parts available'],['coAlarm','Approved audible Carbon Monoxide Alarm fitted']]
+};
+function buildYnn(id,list){
+  const el=document.getElementById(id);
+  el.innerHTML=list.map(([k,t])=>`<div style="padding:7px 0;border-bottom:1px solid #eef"><div style="font-size:15px;margin-bottom:5px">${t}</div><div class="ynn" data-y="${k}">${['Yes','No','NA'].map(v=>`<button type="button" data-v="${v}">${v==='NA'?'N/A':v}</button>`).join('')}</div></div>`).join('');
+}
+buildYnn('gasYnn',Q.gas);buildYnn('elecYnn',Q.elec);buildYnn('bdYnn',Q.bd);buildYnn('advYnn',Q.adv);
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.ynn button');if(!b)return;
+  const g=b.parentElement,on=b.classList.contains('on');
+  g.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+  if(!on)b.classList.add('on');
+  if(g.dataset.y==='isSafe'&&!on&&b.dataset.v==='No'){unsafeChk.checked=true;syncWarn()}
+});
+
+// ---------- state ----------
+let job={},photos=[],fuel='gas',cls='';
+const S=()=>store.get('bfm_settings',{engName:'Paul Bailey',company:'BFM Europe Limited',coAddr:'Trentham Lakes\nStoke-on-Trent\nStaffordshire',coPost:'ST4 4TJ',coTel:'01782 339000',gasSafe:'',idCard:'',nextCert:'1001',officeEmail:''});
+
+function collect(){
+  const o={};
+  document.querySelectorAll('#form [data-k]').forEach(i=>o[i.dataset.k]=i.type==='checkbox'?i.checked:i.value);
+  document.querySelectorAll('#form .ynn').forEach(g=>{const on=g.querySelector('.on');o[g.dataset.y]=on?on.dataset.v:''});
+  o.fuel=fuel;o.cls=cls;o.photos=photos;
+  o.sigEng=sigData('sigEng');o.sigCust=sigData('sigCust');
+  o.id=job.id||('J'+Date.now());o.saved=new Date().toISOString();
+  return o;
+}
+function fill(o){
+  document.querySelectorAll('#form [data-k]').forEach(i=>{const v=o[i.dataset.k];if(i.type==='checkbox')i.checked=!!v;else i.value=v??''});
+  document.querySelectorAll('#form .ynn').forEach(g=>g.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===o[g.dataset.y])));
+  setFuel(o.fuel||'gas');setCls(o.cls||'');photos=o.photos||[];drawPhotos();
+  loadSig('sigEng',o.sigEng);loadSig('sigCust',o.sigCust);syncWarn();
+}
+
+// fuel toggle
+function setFuel(f){fuel=f;document.querySelectorAll('#fuelTog button').forEach(b=>b.classList.toggle('on',b.dataset.fuel===f));
+  gasChecks.classList.toggle('hidden',f!=='gas');elecChecks.classList.toggle('hidden',f!=='elec');
+  document.querySelectorAll('.gasOnly').forEach(e=>e.classList.toggle('hidden',f!=='gas'));
+  const rt=document.querySelector('[data-k=reportType]');
+  if(f==='elec'&&rt.value.startsWith('Gas'))rt.value=rt.value.replace('Gas','Electric Fire');
+  if(f==='gas'&&rt.value.startsWith('Electric Fire'))rt.value=rt.value.replace('Electric Fire','Gas');}
+fuelTog.onclick=e=>{const b=e.target.closest('button');if(b)setFuel(b.dataset.fuel)};
+function setCls(c){cls=c;document.querySelectorAll('#clsTog button').forEach(b=>b.classList.toggle('on',b.dataset.cls===c))}
+clsTog.onclick=e=>{const b=e.target.closest('button');if(b)setCls(b.dataset.cls)};
+function syncWarn(){warnPart.classList.toggle('hidden',!unsafeChk.checked)}
+unsafeChk.onchange=syncWarn;
+
+// ---------- photos ----------
+photoIn.onchange=async e=>{for(const f of e.target.files){photos.push(await shrink(f))}e.target.value='';drawPhotos();saveJob(false)};
+function shrink(f){return new Promise(r=>{const img=new Image();img.onload=()=>{const m=1200,s=Math.min(1,m/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',.72));URL.revokeObjectURL(img.src)};img.src=URL.createObjectURL(f)})}
+function drawPhotos(){photoList.innerHTML=photos.map((p,i)=>`<div><img src="${p}"><button onclick="photos.splice(${i},1);drawPhotos()">×</button></div>`).join('')}
+
+// ---------- signatures ----------
+const sigs={};
+function initSig(id){const c=document.getElementById(id),ctx=c.getContext('2d');let draw=false,blank=true;
+  function size(){const d=c.toDataURL();const r=c.getBoundingClientRect();c.width=r.width*2;c.height=r.height*2;ctx.lineWidth=4;ctx.lineCap='round';ctx.strokeStyle='#0a1a5c';if(!blank){const i=new Image();i.onload=()=>ctx.drawImage(i,0,0,c.width,c.height);i.src=d}}
+  const p=e=>{const r=c.getBoundingClientRect();return[(e.clientX-r.left)*2,(e.clientY-r.top)*2]};
+  c.onpointerdown=e=>{draw=true;blank=false;c.setPointerCapture(e.pointerId);ctx.beginPath();ctx.moveTo(...p(e))};
+  c.onpointermove=e=>{if(!draw)return;ctx.lineTo(...p(e));ctx.stroke()};
+  c.onpointerup=c.onpointercancel=()=>draw=false;
+  sigs[id]={c,ctx,size,isBlank:()=>blank,setBlank:v=>blank=v};size();}
+['sigEng','sigCust'].forEach(initSig);
+document.querySelectorAll('details').forEach(d=>d.addEventListener('toggle',()=>{if(d.open)Object.values(sigs).forEach(s=>{if(s.c.width<10)s.size()})}));
+function clearSig(id){const s=sigs[id];s.ctx.clearRect(0,0,s.c.width,s.c.height);s.setBlank(true)}
+function sigData(id){return sigs[id].isBlank()?'':sigs[id].c.toDataURL('image/png')}
+function loadSig(id,d){clearSig(id);if(!d)return;const s=sigs[id],i=new Image();i.onload=()=>{s.ctx.drawImage(i,0,0,s.c.width,s.c.height);s.setBlank(false)};i.src=d}
+
+// ---------- jobs ----------
+function saveJob(show){job=collect();const all=store.get('bfm_jobs',{});all[job.id]=job;store.set('bfm_jobs',all);if(show)toast('Job saved')}
+function ask(m,cb){askMsg.textContent=m;askYes.onclick=()=>{askDlg.close();cb()};askDlg.showModal()}
+function newJob(){ask('Start a new job? This one will be saved first.',()=>{saveJob(false);startBlank();toast('New job started')})}
+function startBlank(){const s=S();job={};document.querySelectorAll('.found').forEach(e=>e.classList.remove('found'));sheetMsg.textContent='';fill({date:new Date().toISOString().slice(0,10),certNo:s.nextCert,reportType:'Gas Breakdown Record'});
+  s.nextCert=String((parseInt(s.nextCert)||1000)+1);store.set('bfm_settings',s);window.scrollTo(0,0)}
+function showJobs(){saveJob(false);const all=Object.values(store.get('bfm_jobs',{})).sort((a,b)=>b.saved.localeCompare(a.saved));
+  joblist.innerHTML=all.length?all.map(j=>`<div class="job"><div><b>Cert ${esc(j.certNo)}</b> ${j.unsafe?'<span class="tag r">UNSAFE</span>':''}<span class="tag">${j.fuel==='elec'?'Electric':'Gas'}</span><br>${esc(j.siteName)} ${esc(j.sitePost)}<br><small>${esc(j.date)} · ${esc(j.appMake)} ${esc(j.appModel)}</small></div><button class="btn alt" onclick="openJob('${j.id}')">Open</button><button class="btn red" onclick="delJob('${j.id}')">🗑</button></div>`).join(''):'<p>No saved jobs yet.</p>';
+  jobsDlg.showModal()}
+function openJob(id){const j=store.get('bfm_jobs',{})[id];if(!j)return;job=j;fill(j);jobsDlg.close();toast('Job opened')}
+function delJob(id){jobsDlg.close();ask('Delete this job? This cannot be undone.',()=>{const all=store.get('bfm_jobs',{});delete all[id];store.set('bfm_jobs',all);if(job.id===id)job={};showJobs()})}
+setInterval(()=>saveJob(false),30000);
+
+// settings
+function openSettings(){const s=S();document.querySelectorAll('[data-s]').forEach(i=>i.value=s[i.dataset.s]??'');settingsDlg.showModal()}
+function saveSettings(){const s=S();document.querySelectorAll('[data-s]').forEach(i=>s[i.dataset.s]=i.value);store.set('bfm_settings',s);settingsDlg.close();toast('Details saved')}
+
+// ---------- report ----------
+const yn=v=>v==='NA'?'N/A':(v||'');
+function rows(pairs,o){return pairs.map(([k,t])=>`<tr><td style="width:60%">${t}</td><td class="v">${esc(yn(o[k]))}</td></tr>`).join('')}
+function half(list){const m=Math.ceil(list.length/2);return[list.slice(0,m),list.slice(m)]}
+function header(o,title,s){return`<div class="top"><div class="brand">${esc(s.company)}<small>${s.gasSafe?'Gas Safe Reg No. '+esc(s.gasSafe):''}</small></div><div class="title">${esc(title)}</div><div class="cert">Cert. No. <b>${esc(o.certNo)}</b></div></div>`}
+function buildReport(o){
+  const s=S(),isGas=o.fuel!=='elec';
+  const checks=isGas?Q.gas:Q.elec,[c1,c2]=half(checks),[a1,a2]=half(Q.adv);
+  const readings=isGas?[['Operating pressure (mbar)',o.opPress],['Burner pressure (mbar)',o.burnPress],['Tightness test',o.tightness]]
+                      :[['Earth continuity (Ω)',o.earthR],['Insulation resistance (MΩ)',o.insR],['Fuse rating (A)',o.fuse],['Rated power (kW)',o.ratedKw]];
+  let h=`<div class="rp">${header(o,o.reportType,s)}
+  <div class="sec"><div class="cols3">
+   <div><span class="h">Company / Installer</span><table>
+    <tr><td>Engineer</td><td class="v">${esc(s.engName)}</td></tr><tr><td>Company</td><td class="v">${esc(s.company)}</td></tr>
+    <tr><td>Address</td><td class="v">${nl(s.coAddr)}</td></tr><tr><td>Post Code</td><td class="v">${esc(s.coPost)}</td></tr>
+    <tr><td>Tel No.</td><td class="v">${esc(s.coTel)}</td></tr>${isGas?`<tr><td>Gas Safe Reg No.</td><td class="v">${esc(s.gasSafe)}</td></tr><tr><td>ID Card No.</td><td class="v">${esc(s.idCard)}</td></tr>`:''}</table></div>
+   <div><span class="h">Job Address</span><table>
+    <tr><td>Name</td><td class="v">${esc(o.siteName)}</td></tr><tr><td>Call No.</td><td class="v">${esc(o.jobRef)}${o.callType?' ('+esc(o.callType)+')':''}</td></tr><tr><td>Address</td><td class="v">${nl(o.siteAddr)}</td></tr>
+    <tr><td>Post Code</td><td class="v">${esc(o.sitePost)}</td></tr><tr><td>Tel. No</td><td class="v">${esc(o.siteTel)}</td></tr></table></div>
+   <div><span class="h">Client / Landlord</span><table>
+    <tr><td>Name</td><td class="v">${esc(o.cliName)}</td></tr><tr><td>Company</td><td class="v">${esc(o.cliCo)}</td></tr>
+    <tr><td>Address</td><td class="v">${nl(o.cliAddr)}</td></tr><tr><td>Post Code</td><td class="v">${esc(o.cliPost)}</td></tr><tr><td>Tel. No</td><td class="v">${esc(o.cliTel)}</td></tr></table></div>
+  </div></div>
+  <div class="sec"><span class="h">Appliance Details</span><div class="cols2">
+   <table><tr><td>Type</td><td class="v">${esc(o.appType)}</td></tr><tr><td>Make</td><td class="v">${esc(o.appMake)}</td></tr><tr><td>Model</td><td class="v">${esc(o.appModel)}</td></tr><tr><td>Location (Position/Room)</td><td class="v">${esc(o.appLoc)}</td></tr><tr><td>Serial No.</td><td class="v">${esc(o.appSerial)}</td></tr><tr><td>Install date</td><td class="v">${esc(o.installDate)}</td></tr></table>
+   <table>${isGas?`<tr><td>Flue type</td><td class="v">${esc(o.flueType)}</td></tr>`:''}<tr><td>Fault reported</td><td class="v">${nl(o.reported)}</td></tr></table>
+  </div></div>
+  <div class="sec"><span class="h">Safety Checks</span><div class="cols2"><table>${rows(c1,o)}${readings.slice(0,2).map(([t,v])=>`<tr><td>${t}</td><td class="v">${esc(v)}</td></tr>`).join('')}</table><table>${rows(c2,o)}${readings.slice(2).map(([t,v])=>`<tr><td>${t}</td><td class="v">${esc(v)}</td></tr>`).join('')}</table></div>
+   <span class="h" style="margin-top:4px">Breakdown</span><div class="cols2">
+    <table><tr><td style="width:60%">Location of fault</td><td class="v">${esc(o.faultLoc)}</td></tr>${rows([Q.bd[0]],o)}</table>
+    <table>${rows(Q.bd.slice(1),o)}</table>
+    <div class="box">${esc(o.partsList)}${o.workDone?'\n'+esc(o.workDone):''}</div><div class="box">${o.partsReq?'Parts required: '+esc(o.partsReq):''}</div></div></div>
+  <div class="sec"><span class="h">Appliance / system advice and recommendations</span><div class="cols2"><table>${rows(a1,o)}</table><table>${rows(a2,o)}</table></div>
+   <div class="small">*Although regular servicing is essential, an audible Carbon Monoxide Alarm is an early warning device that keeps working 24 hours a day should an unforeseen event occur. Battery operated models have a limited lifespan; customers should check the expiry date periodically.</div></div>
+  <div class="sec" style="display:grid;grid-template-columns:1fr 2fr;gap:10px">
+   <div><b>Engineer Comments</b><div class="box">${o.comments?'Please see the additional page for the engineer\'s comments':''}</div></div>
+   <div><span class="h">Signatures</span><table><tr>
+    <td>Issued by:<br>${o.sigEng?`<img class="sigimg" src="${o.sigEng}">`:'<div class="sigimg"></div>'}<br>Print Name: <b>${esc(s.engName)}</b></td>
+    <td>Received by:<br>${o.sigCust?`<img class="sigimg" src="${o.sigCust}">`:`<div class="sigimg">${esc(o.custAbsent)}</div>`}<br>Print Name: <b>${esc(o.custName)}</b></td>
+    <td>Date<br><b>${fmtDate(o.date)}</b></td></tr></table></div></div>
+  </div>`;
+  // comments page
+  h+=`<div class="rp">${header(o,o.reportType+' – Engineer Comments',s)}<div class="sec"><span class="h">Comments</span><div class="box" style="min-height:120px;font-size:11px">${nl(o.comments)}</div></div>
+  ${o.photos&&o.photos.length?`<div class="sec"><span class="h">Photos</span><div class="phgrid">${o.photos.map(p=>`<img src="${p}">`).join('')}</div></div>`:''}</div>`;
+  // warning notice
+  if(o.unsafe){
+    const C={ID:['IMMEDIATELY DANGEROUS (ID)','The installation/appliance is an immediate danger to life or property. With your permission it has been disconnected. It must NOT be used or reconnected until the fault has been put right by a competent person.'],
+             AR:['AT RISK (AR)','One or more faults exist which could become a danger to life or property. With your permission the appliance has been turned off. It should not be used until the fault has been put right.'],
+             NCS:['NOT TO CURRENT STANDARDS (NCS)','The installation/appliance does not meet current standards but is not considered unsafe at this time. You are advised to have it brought up to current standards.']};
+    const t=(k,txt)=>`<div><span class="tick">${o[k]?'✓':''}</span>${txt}</div>`;
+    h+=`<div class="rp">${header(o,'Warning / Advice Notice',s)}
+    <div class="warnhead">${isGas?'GAS':'ELECTRICAL'} SAFETY WARNING – DO NOT USE<small>This appliance has been found to be unsafe</small></div>
+    <div class="sec"><div class="cols3">
+     <div><span class="h">Job Address</span><div class="box">${esc(o.siteName)}\n${esc(o.siteAddr)}\n${esc(o.sitePost)}</div></div>
+     <div><span class="h">Appliance</span><div class="box">${esc(o.appType)} – ${esc(o.appMake)} ${esc(o.appModel)}\nLocation: ${esc(o.appLoc)}\nSerial: ${esc(o.appSerial)}</div></div>
+     <div><span class="h">Engineer</span><div class="box">${esc(s.engName)}, ${esc(s.company)}\n${isGas&&s.gasSafe?'Gas Safe Reg '+esc(s.gasSafe)+'  ID '+esc(s.idCard)+'\n':''}Tel ${esc(s.coTel)}</div></div></div></div>
+    <div class="sec"><span class="h">Classification</span><div class="cls">${['ID','AR','NCS'].map(k=>`<div class="${o.cls===k?'on':''}"><span class="tick">${o.cls===k?'✓':''}</span><b>${C[k][0]}</b><br>${C[k][1]}</div>`).join('')}</div></div>
+    <div class="sec"><div class="cols2"><div><span class="h">Reason the appliance is unsafe</span><div class="box" style="min-height:70px">${nl(o.unsafeReason)}</div></div>
+     <div><span class="h">Action taken</span><div class="box" style="min-height:70px;white-space:normal">${t('actOff','Appliance turned off')}${t('actDisc','Appliance disconnected / supply capped or isolated')}${t('actLabel','Warning label attached')}${t('actExplained','Situation explained and notice left with responsible person')}${t('actRefused','Responsible person refused permission to make safe')}${t('actEsp','Reported to Gas Emergency Service')}${t('actRiddor','RIDDOR report needed / made')}</div></div></div></div>
+    <div class="notice"><b>I confirm that, as the responsible person, the above has been explained to me and I have received this notice.</b> Using this appliance after it has been classified as unsafe could endanger life or property and may be an offence.${isGas?' <b>If you smell gas, call the Gas Emergency Service on 0800 111 999.</b> To check a gas engineer, call Gas Safe Register on 0800 408 5500.':' Do not reconnect this appliance until it has been repaired by a competent person.'}</div>
+    <div class="sec"><table><tr>
+     <td>Engineer signature<br>${o.sigEng?`<img class="sigimg" src="${o.sigEng}">`:'<div class="sigimg"></div>'}<br>${esc(s.engName)}</td>
+     <td>Responsible person signature<br>${o.sigCust?`<img class="sigimg" src="${o.sigCust}">`:`<div class="sigimg">${esc(o.custAbsent)}</div>`}<br>${esc(o.custName)}</td>
+     <td>Date<br><b>${fmtDate(o.date)}</b></td></tr></table></div></div>`;
+  }
+  return h;
+}
+function fmtDate(d){if(!d)return'';const x=new Date(d+'T12:00');return x.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+function printReport(){saveJob(false);report.innerHTML=buildReport(job);previewWrap.classList.add('show');previewWrap.scrollTop=0}
+function doPrint(){try{window.print()}catch(e){}setTimeout(()=>{if(document.hasFocus())toast('If nothing opened, printing is blocked here – it will work once the app is on your website')},1500)}
+function emailReport(){saveJob(false);const o=job,s=S();
+  const to=[o.siteEmail,s.officeEmail].filter(Boolean).join(',');
+  const subj=`${o.reportType} – Cert ${o.certNo} – ${o.siteName||''} ${o.sitePost||''}${o.unsafe?' – UNSAFE ('+o.cls+')':''}`;
+  const body=`Hello,\n\nPlease find attached the ${o.reportType} for the visit on ${fmtDate(o.date)}.\n\nAddress: ${o.siteName}, ${(o.siteAddr||'').replace(/\n/g,', ')} ${o.sitePost}\nAppliance: ${o.appMake} ${o.appModel} (${o.appLoc})\nFault resolved: ${yn(o.faultResolved)}\nAppliance safe: ${o.unsafe?'NO – '+o.cls:yn(o.isSafe)}\n\nComments:\n${o.comments||''}\n\nKind regards\n${s.engName}\n${s.company}\n${s.coTel}`;
+  const href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+  mTo.value=to;mSubj.value=subj;mBody.value=body;mLink.href=href;mailDlg.showModal();try{location.href=href}catch(e){}}
+function copyMail(){const t='To: '+mTo.value+'\nSubject: '+mSubj.value+'\n\n'+mBody.value;try{navigator.clipboard.writeText(t).then(()=>toast('Copied'),()=>{mBody.select();toast('Select all and copy')})}catch(e){mBody.select()}}
+
+let PDFJS_BASE='https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/';
+
+// ---------- job sheet reader ----------
+const UKPC=/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/;
+const tidy=t=>t.replace(/ /g,' ').replace(/\r/g,'').replace(/[ \t]+/g,' ');
+const titleCase=t=>t.toLowerCase().replace(/\b([a-z])/g,c=>c.toUpperCase()).replace(/\bMc(\w)/g,(m,c)=>'Mc'+c.toUpperCase());
+const fixCase=t=>t&&t===t.toUpperCase()&&/[A-Z]{3}/.test(t)?titleCase(t):t;
+const CALLTYPES={WAR:'Warranty',CHG:'Chargeable',CHA:'Chargeable',SER:'Service',INS:'Installation',REC:'Recall'};
+function common(t,r){
+  const em=(t.match(/[\w.+-]+@[\w-]+\.[\w.-]+/g)||[]).find(e=>!/bfm-europe/i.test(e));if(em)r.siteEmail=em;
+  const ph=(t.match(/\b0\d{2,4}\s?\d{3}\s?\d{3,4}\b/g)||[]).find(p=>!/^01782\s?3390/.test(p));if(ph)r.siteTel=ph;
+  return r}
+function parseEmailText(t){
+  const r={},L=t.split('\n').map(x=>x.trim());
+  let m=t.match(/Call Number\s*\n?\s*([\d,]{4,8})/i);if(m)r.jobRef=m[1].replace(/,/g,'');
+  m=t.match(/Scheduled Arrival Date\/Time\s*\n?\s*([^\n]+)/i);if(m)r.appt=m[1].trim();
+  m=t.match(/Description\s*\n([\s\S]*?)\n\s*Site Information/i);if(m)r.reported=m[1].split('\n').map(x=>x.trim()).filter(Boolean).join('\n');
+  const i=L.findIndex(x=>/^Site Address$/i.test(x));
+  if(i>=0){const blk=[];for(let k=i+1;k<L.length&&!/^Site Contact/i.test(L[k]);k++)if(L[k])blk.push(L[k]);
+    if(blk.length){r.siteName=fixCase(blk.shift());const pc=blk.findIndex(x=>UKPC.test(x));
+      if(pc>=0){r.sitePost=blk[pc].match(UKPC)[1];blk.splice(pc,1)}r.siteAddr=blk.join('\n')}}
+  m=t.match(/Call\s+(\d{4,6})\s+@\s+([^\n]+)/i);if(m){r.jobRef=r.jobRef||m[1];r.siteName=r.siteName||fixCase(m[2].trim())}
+  return common(t,r)}
+function parsePdfText(t){
+  const r={};t=t.replace(/\s+/g,' ');let m;
+  m=t.match(/Job Number:?\s*(\d{4,6})/i)||t.match(/\b(\d{5})\b/);if(m)r.jobRef=m[1];
+  m=t.match(/\b([A-Z]{1,2})\s+(WAR|CHG|CHA|SER|INS|REC)\s+(OPEN|CLOSED|COMPLETE\w*|ALLOCATED|PENDING)\b/);if(m)r.callType=CALLTYPES[m[2]]||m[2];
+  m=t.match(/\b(?:OPEN|CLOSED|COMPLETE\w*|ALLOCATED|PENDING)\s+(.+?)\s+\d{2}\/\d{2}\/\d{4}/);if(m)r.siteName=fixCase(m[1].trim());
+  m=t.match(/Site Name:?\s*(.+?)\s*([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);
+  if(m){r.siteAddr=m[1].trim();r.sitePost=m[2]}
+  else{m=t.match(/Address:?\s*(.+?)\s*([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);if(m){r.siteAddr=m[1].replace(/Site Name:?/,'').trim();r.sitePost=m[2]}}
+  if(r.siteAddr&&r.siteName&&r.siteAddr.toUpperCase().startsWith(r.siteName.toUpperCase()))r.siteAddr=r.siteAddr.slice(r.siteName.length).trim();
+  if(r.siteAddr)r.siteAddr=splitAddr(r.siteAddr);
+  m=t.match(/Call Details\s*(.+?)\s*(?:Problem:|Engineer Name:|Serial No:|Product:)/i);if(m)r.reported=m[1].trim();
+  m=t.match(/\b([A-Z0-9]{5,12})\s+-\s+([A-Z0-9][A-Z0-9 &\/.'-]{2,40}?)\s+(?=Product:|Serial No|Scheduled|Install|Engineer|$)/)||t.match(/Product:\s*([A-Z0-9]{5,12})\s+-\s+([A-Z0-9][A-Z0-9 &\/.'-]{2,40}?)(?=\s+[A-Z][a-z]|\s+\w+:|$)/);
+  if(m){const name=m[2].trim().split(' ');r.appMake=titleCase(name.shift());r.appModel=(name.join(' ')+' ('+m[1]+')').trim();r.productCode=m[1]}
+  const cands=[];let re=/([A-Z0-9]{5,})\s+Serial No/g,x;while((x=re.exec(t)))cands.push(x[1]);
+  re=/Serial No:?\s*([A-Z0-9]{5,})/g;while((x=re.exec(t)))cands.push(x[1]);
+  const ser=cands.find(c=>c!==r.productCode&&(c.match(/\d/g)||[]).length>=c.length/2);if(ser)r.appSerial=ser;
+  m=t.match(/Install Date:?\s*(\d{2}\/\d{2}\/\d{4})/i)||t.match(/(\d{2}\/\d{2}\/\d{4})\s*Install Date/i);if(m)r.installDate=m[1];
+  m=t.match(/Scheduled Arrival:?\s*(\d{2}\/\d{2}\/\d{4}\s*\d{2}:\d{2})/i);if(m)r.appt=m[1];
+  return common(t,r)}
+function splitAddr(a){ // put town / county on new lines where we can
+  return a.replace(/\s+(?=(?:West Midlands|Staffordshire|Cheshire|Shropshire|Derbyshire|Greater Manchester|Lancashire|Yorkshire|West Yorkshire|South Yorkshire|Merseyside|Worcestershire|Warwickshire|Leicestershire|Nottinghamshire|Stoke-on-Trent|Wolverhampton|Birmingham|Stafford|Newcastle-under-Lyme)\b)/g,'\n')}
+function parseSheet(text){text=tidy(text);return /Service Job Sheet|Job Number:|Field Report/i.test(text)?parsePdfText(text):parseEmailText(text)}
+function loadSheetText(text,src){
+  if(!text||!text.trim()){sheetMsg.textContent='Nothing to read – paste the email text first.';return}
+  const r=parseSheet(text);
+  if(!document.querySelector('[data-k=cliCo]').value)Object.assign(r,{cliCo:'BFM Europe Ltd',cliAddr:'Trentham Lakes\nStoke-on-Trent\nStaffordshire',cliPost:'ST4 4TJ',cliTel:'01782 339000'});
+  document.querySelectorAll('.found').forEach(e=>e.classList.remove('found'));
+  let n=0;for(const[k,v]of Object.entries(r)){const el=document.querySelector('#form [data-k='+k+']');if(el&&v){el.value=v;el.classList.add('found');n++}}
+  job.sheetText=text.slice(0,20000);
+  sheetMsg.innerHTML=n?`✅ Filled in <b>${n}</b> boxes${src?' from '+esc(src):''}. Check the yellow ones are right.`:'⚠️ Couldn\'t find the job details in that. Try the other way (PDF or paste), or type them in.';
+  pasteBox.classList.add('hidden');pasteTxt.value='';saveJob(false)}
+let pdfjs=null;
+async function getPdfJs(){if(pdfjs)return pdfjs;globalThis.pdfjsWorker=await import(PDFJS_BASE+'pdf.worker.min.mjs');pdfjs=await import(PDFJS_BASE+'pdf.min.mjs');return pdfjs}
+sheetIn.onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;sheetMsg.textContent='Reading '+f.name+'…';
+  try{const lib=await getPdfJs();const doc=await lib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;let out='';
+    for(let p=1;p<=doc.numPages;p++){const c=await(await doc.getPage(p)).getTextContent();out+=c.items.map(i=>i.str).join(' ')+'\n'}
+    loadSheetText(out,f.name)}
+  catch(err){console.error(err);sheetMsg.innerHTML='⚠️ Couldn\'t open that PDF here (the PDF reader needs an internet connection). Use “Paste email text” instead.'}};
+
+// ---------- start ----------
+(function(){const all=store.get('bfm_jobs',{}),last=Object.values(all).sort((a,b)=>b.saved.localeCompare(a.saved))[0];
+  if(last){job=last;fill(last)}else startBlank();
+  if(!S().gasSafe)setTimeout(()=>toast('Tap “My details” to add your Gas Safe number'),800)})();
+</script>
+</body>
+</html>
