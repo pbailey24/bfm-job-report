@@ -276,21 +276,28 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
 </details>
 
 <details class="step" open>
-<summary><span class="num">8</span> Save, print & send</summary>
+<summary><span class="num">8</span> Make the PDF & send it</summary>
 <div class="body">
   <p class="help">
-    <b>To get a PDF:</b> tap “Report / PDF” to check it, then “Print / Save PDF” and choose <b>Save as PDF</b> (on iPhone: Share → Print → pinch out → Share; on Android/PC: Print → Save as PDF).<br>
-    <b>To send it:</b> tap “Email”. Your email app opens with the details filled in. Attach the PDF you just saved.
+    <b>1.</b> Tap <b>Make PDF</b>.<br>
+    <b>2.</b> Tap <b>Send PDF</b> and choose <b>Outlook</b> (or Mail). The PDF is already attached and the message is filled in.<br>
+    <b>3.</b> Put in who it's going to – tap <b>Copy email address</b> first, then paste it into the “To” box.
   </p>
   <div class="actions">
     <button class="btn" onclick="saveJob(true)">💾 Save job</button>
-    <button class="btn" onclick="printReport()">📄 Report / PDF</button>
-    <button class="btn alt" onclick="emailReport()">✉️ Email</button>
+    <button class="btn" onclick="makePdf()">📄 Make PDF</button>
     <button class="btn red" onclick="newJob()">➕ New job</button>
   </div>
+  <div id="pdfMsg" style="margin:8px 0;font-size:15px"></div>
+  <div id="pdfActions" class="actions hidden">
+    <button class="btn" id="shareBtn" onclick="sharePdf()">📤 Send PDF</button>
+    <a class="btn alt" id="pdfUrl" href="#" style="text-decoration:none;text-align:center">⬇️ Download PDF</a>
+    <button class="btn alt" onclick="copyTo()">📋 Copy email address</button>
+  </div>
+  <p style="margin-top:14px"><button class="btn alt" onclick="printReport()">👁 Preview report on screen</button> <button class="btn alt" onclick="emailReport()">✉️ Email without PDF</button></p>
 </div>
 </details>
-<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.4</b> · 9 Nov 2026</p>
+<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.5</b> · 9 Nov 2026</p>
 </main>
 
 <div id="previewWrap"><div id="previewBar"><span>Report preview – scroll to check it</span><button class="btn" onclick="doPrint()">🖨 Print / Save PDF</button><button class="btn alt" onclick="previewWrap.classList.remove('show')">Close</button></div><div id="report"></div></div>
@@ -411,7 +418,7 @@ function loadSig(id,d){clearSig(id);if(!d)return;const s=sigs[id],i=new Image();
 function saveJob(show){job=collect();const all=store.get('bfm_jobs',{});all[job.id]=job;store.set('bfm_jobs',all);if(show)toast('Job saved')}
 function ask(m,cb){askMsg.textContent=m;askYes.onclick=()=>{askDlg.close();cb()};askDlg.showModal()}
 function newJob(){ask('Start a new job? This one will be saved first.',()=>{saveJob(false);startBlank();toast('New job started')})}
-function startBlank(){const s=S();job={};document.querySelectorAll('.found').forEach(e=>e.classList.remove('found'));sheetMsg.textContent='';fill({date:new Date().toISOString().slice(0,10),certNo:s.nextCert,reportType:'Gas Breakdown Record'});
+function startBlank(){madePdf=null;pdfActions&&pdfActions.classList.add('hidden');pdfMsg&&(pdfMsg.textContent='');const s=S();job={};document.querySelectorAll('.found').forEach(e=>e.classList.remove('found'));sheetMsg.textContent='';fill({date:new Date().toISOString().slice(0,10),certNo:s.nextCert,reportType:'Gas Breakdown Record'});
   s.nextCert=String((parseInt(s.nextCert)||1000)+1);store.set('bfm_settings',s);window.scrollTo(0,0)}
 function showJobs(){saveJob(false);const all=Object.values(store.get('bfm_jobs',{})).sort((a,b)=>b.saved.localeCompare(a.saved));
   joblist.innerHTML=all.length?all.map(j=>`<div class="job"><div><b>Cert ${esc(j.certNo)}</b> ${j.unsafe?'<span class="tag r">UNSAFE</span>':''}<span class="tag">${j.fuel==='elec'?'Electric':'Gas'}</span><br>${esc(j.siteName)} ${esc(j.sitePost)}<br><small>${esc(j.date)} · ${esc(j.appMake)} ${esc(j.appModel)}</small></div><button class="btn alt" onclick="openJob('${j.id}')">Open</button><button class="btn red" onclick="delJob('${j.id}')">🗑</button></div>`).join(''):'<p>No saved jobs yet.</p>';
@@ -494,12 +501,14 @@ function buildReport(o){
 function fmtDate(d){if(!d)return'';const x=new Date(d+'T12:00');return x.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
 function printReport(){saveJob(false);report.innerHTML=buildReport(job);previewWrap.classList.add('show');previewWrap.scrollTop=0}
 function doPrint(){try{window.print()}catch(e){}setTimeout(()=>{if(document.hasFocus())toast('If nothing opened, printing is blocked here – it will work once the app is on your website')},1500)}
-function emailReport(){saveJob(false);const o=job,s=S();
-  const to=[o.siteEmail,s.officeEmail].filter(Boolean).join(',');
-  const subj=`${o.reportType} – Cert ${o.certNo} – ${o.siteName||''} ${o.sitePost||''}${o.unsafe?' – UNSAFE ('+o.cls+')':''}`;
-  const body=`Hello,\n\nPlease find attached the ${o.reportType} for the visit on ${fmtDate(o.date)}.\n\nAddress: ${o.siteName}, ${(o.siteAddr||'').replace(/\n/g,', ')} ${o.sitePost}\nAppliance: ${o.appMake} ${o.appModel} (${o.appLoc})\nFault resolved: ${yn(o.faultResolved)}\nAppliance safe: ${o.unsafe?'NO – '+o.cls:yn(o.isSafe)}\n\nComments:\n${o.comments||''}\n\nKind regards\n${s.engName}\n${s.company}\n${s.coTel}`;
+function mailTo(o){return[o.siteEmail,S().officeEmail].filter(Boolean).join(',')}
+function mailSubject(o){return `${o.reportType} – Cert ${o.certNo} – ${o.siteName||''} ${o.sitePost||''}${o.unsafe?' – UNSAFE ('+o.cls+')':''}`}
+function mailBody(o){const s=S();return `Hello,\n\nPlease find attached the ${o.reportType} for the visit on ${fmtDate(o.date)}.\n\nAddress: ${o.siteName||''}, ${(o.siteAddr||'').replace(/\n/g,', ')} ${o.sitePost||''}\nCall no: ${o.jobRef||''}\nAppliance: ${o.appMake||''} ${o.appModel||''} (${o.appLoc||''})\nFault resolved: ${yn(o.faultResolved)}\nAppliance safe: ${o.unsafe?'NO – '+o.cls:yn(o.isSafe)}\n\nComments:\n${o.comments||''}\n\nKind regards\n${s.engName}\n${s.company}\n${s.coTel}`}
+function emailReport(){saveJob(false);const o=job,to=mailTo(o),subj=mailSubject(o),body=mailBody(o);
   const href=`mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
   mTo.value=to;mSubj.value=subj;mBody.value=body;mLink.href=href;mailDlg.showModal();try{location.href=href}catch(e){}}
+function copyTo(){const t=mailTo(job);if(!t){toast('No email address – add one in step 1 or My details');return}
+  try{navigator.clipboard.writeText(t).then(()=>toast('Copied: '+t),()=>toast(t))}catch(e){toast(t)}}
 function copyMail(){const t='To: '+mTo.value+'\nSubject: '+mSubj.value+'\n\n'+mBody.value;try{navigator.clipboard.writeText(t).then(()=>toast('Copied'),()=>{mBody.select();toast('Select all and copy')})}catch(e){mBody.select()}}
 
 let PDFJS_BASE='https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/';
@@ -563,6 +572,132 @@ sheetIn.onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)ret
     for(let p=1;p<=doc.numPages;p++){const c=await(await doc.getPage(p)).getTextContent();out+=c.items.map(i=>i.str).join(' ')+'\n'}
     loadSheetText(out,f.name)}
   catch(err){console.error(err);sheetMsg.innerHTML='⚠️ Couldn\'t open that PDF here (the PDF reader needs an internet connection). Use “Paste email text” instead.'}};
+
+// ---------- real PDF (pdf-lib) ----------
+let PDFLIB_URL='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+function loadPdfLib(){if(window.PDFLib)return Promise.resolve(window.PDFLib);
+  return new Promise((ok,bad)=>{const s=document.createElement('script');s.src=PDFLIB_URL;s.onload=()=>ok(window.PDFLib);s.onerror=()=>bad(new Error('pdf-lib failed to load'));document.head.appendChild(s)})}
+const W=s=>String(s??'').replace(/[–—]/g,'-').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/Ω/g,'ohm').replace(/₂/g,'2').replace(/✓/g,'Y').replace(/\r/g,'').replace(/[^\n\x20-\x7E\xA0-\xFF]/g,'');
+function b64bytes(d){const b=atob(d.split(',')[1]);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u}
+async function genPdf(o){
+  const {PDFDocument,StandardFonts,rgb}=await loadPdfLib();
+  const s=S(),isGas=o.fuel!=='elec';
+  const doc=await PDFDocument.create();doc.setTitle(W(o.reportType+' '+o.certNo));doc.setAuthor(W(s.engName));
+  const F=await doc.embedFont(StandardFonts.Helvetica),FB=await doc.embedFont(StandardFonts.HelveticaBold);
+  const NAVY=rgb(.12,.23,.34),GREY=rgb(.93,.93,.93),LINE=rgb(.7,.7,.7),RED=rgb(.75,.15,.18),BLACK=rgb(0,0,0),WHITE=rgb(1,1,1),PINK=rgb(1,.88,.88);
+  const PW=842,PH=595,M=20,FS=7.5,LH=9.2;
+  let page;
+  const T=(t,x,y,o2={})=>page.drawText(W(t),{x,y,size:o2.size||FS,font:o2.bold?FB:F,color:o2.color||BLACK});
+  const R=(x,y,w,h,o2={})=>page.drawRectangle({x,y,width:w,height:h,color:o2.fill,borderColor:o2.stroke,borderWidth:o2.stroke?(o2.bw||.6):0});
+  function wrap(t,w,size=FS,font=F){const out=[];for(const para of W(t).split('\n')){let line='';for(const word of para.split(' ')){const tryL=line?line+' '+word:word;
+        if(font.widthOfTextAtSize(tryL,size)<=w)line=tryL;else{if(line)out.push(line);line=word;while(font.widthOfTextAtSize(line,size)>w){let k=line.length;while(k>1&&font.widthOfTextAtSize(line.slice(0,k),size)>w)k--;out.push(line.slice(0,k));line=line.slice(k)}}}
+      out.push(line)}return out}
+  function header(title){page=doc.addPage([PW,PH]);
+    T(s.company,M,PH-M-12,{size:12,bold:true,color:NAVY});
+    if(isGas&&s.gasSafe)T('Gas Safe Reg No. '+s.gasSafe,M,PH-M-22,{size:7});
+    const tw=FB.widthOfTextAtSize(W(title),12);R(PW/2-tw/2-30,PH-M-24,tw+60,20,{fill:GREY,stroke:LINE});T(title,PW/2-tw/2,PH-M-18,{size:12,bold:true});
+    const ct='Cert. No. '+(o.certNo||'');T(ct,PW-M-F.widthOfTextAtSize(W(ct),9),PH-M-16,{size:9,bold:true});
+    return PH-M-34}
+  function bar(label,x,y,color=NAVY){const w=FB.widthOfTextAtSize(W(label),8)+10;R(x,y-11,w,11,{fill:color});T(label,x+5,y-8.5,{size:8,bold:true,color:WHITE});return y-14}
+  function table(x,y,w,rows,lf=.55){const lw=w*lf,vw=w-lw-2;
+    for(const[l,v]of rows){const ll=wrap(l,lw-4),vl=wrap(v??'',vw-4);const h=Math.max(ll.length,vl.length,1)*LH+2;
+      ll.forEach((t,i)=>T(t,x+2,y-LH*(i+1)+1));R(x+lw,y-h,vw,h-1,{fill:WHITE,stroke:LINE,bw:.4});
+      vl.forEach((t,i)=>T(t,x+lw+3,y-LH*(i+1)+1));y-=h}return y}
+  function textBox(x,y,w,txt,minH=24,size=FS){const lines=wrap(txt,w-8,size);const h=Math.max(minH,lines.length*(size+1.8)+6);
+    R(x,y-h,w,h,{fill:WHITE,stroke:BLACK,bw:.6});lines.forEach((t,i)=>T(t,x+4,y-(size+2)*(i+1),{size}));return y-h}
+  function section(y,draw){const top=y;const yb=draw(y-3)-4;R(M,yb,PW-2*M,top-yb,{stroke:LINE,bw:.6});return yb-5}
+  const yn=v=>v==='NA'?'N/A':(v||'');
+  const qrows=list=>list.map(([k,t])=>[t,yn(o[k])]);
+  const half=a=>{const m=Math.ceil(a.length/2);return[a.slice(0,m),a.slice(m)]};
+  const sigImg=async d=>d?await doc.embedPng(b64bytes(d)):null;
+  const engSig=await sigImg(o.sigEng),custSig=await sigImg(o.sigCust);
+  function sigs(y,x0,w){const cw=(w-20)/3;
+    const one=(lbl,img,name,x)=>{T(lbl,x,y-9,{bold:true});R(x,y-46,cw-20,34,{fill:WHITE,stroke:LINE});
+      if(img){const sc=Math.min((cw-24)/img.width,30/img.height);page.drawImage(img,{x:x+2,y:y-44,width:img.width*sc,height:img.height*sc})}
+      else if(lbl.startsWith('Rec')&&o.custAbsent)T(o.custAbsent,x+4,y-30);
+      T('Print name: '+(name||''),x,y-56)};
+    one('Issued by (engineer):',engSig,s.engName,x0);one('Received by (customer):',custSig,o.custName,x0+cw);
+    T('Date',x0+2*cw,y-9,{bold:true});T(fmtDate(o.date),x0+2*cw,y-22,{size:10,bold:true});return y-62}
+
+  // ---- page 1: record ----
+  let y=header(o.reportType);const cw=(PW-2*M-16)/3;
+  y=section(y,yy=>{const ys=[];
+    let a=bar('Company / Installer',M+4,yy);ys.push(table(M+4,a,cw-4,[['Engineer',s.engName],['Company',s.company],['Address',s.coAddr],['Post code',s.coPost],['Tel. no',s.coTel],...(isGas?[['Gas Safe Reg No.',s.gasSafe],['ID card no.',s.idCard]]:[])],.36));
+    a=bar('Job Address',M+8+cw,yy);ys.push(table(M+8+cw,a,cw-4,[['Name',o.siteName],['Call no.',(o.jobRef||'')+(o.callType?' ('+o.callType+')':'')],['Address',o.siteAddr],['Post code',o.sitePost],['Tel. no',o.siteTel]],.3));
+    a=bar('Client / Landlord',M+12+2*cw,yy);ys.push(table(M+12+2*cw,a,cw-8,[['Name',o.cliName],['Company',o.cliCo],['Address',o.cliAddr],['Post code',o.cliPost],['Tel. no',o.cliTel]],.3));
+    return Math.min(...ys)});
+  const hw=(PW-2*M-20)/2;
+  y=section(y,yy=>{const a=bar('Appliance Details',M+4,yy);
+    const y1=table(M+4,a,hw,[['Type',o.appType],['Make',o.appMake],['Model',o.appModel],['Location (position / room)',o.appLoc],['Serial no.',o.appSerial],['Install date',o.installDate]],.45);
+    const y2=table(M+16+hw,a,hw,[...(isGas?[['Flue type',o.flueType]]:[]),['Fault reported',o.reported]],.25);return Math.min(y1,y2)});
+  const checks=isGas?Q.gas:Q.elec;
+  const readings=isGas?[['Burner pressure (mbar)',o.burnPress],['Tightness test',o.tightness]]:[['Earth continuity (ohm)',o.earthR],['Insulation resistance (Mohm)',o.insR],['Fuse rating (A)',o.fuse],['Rated power (kW)',o.ratedKw]];
+  const [c1,c2]=half([...qrows(checks),...readings]);
+  y=section(y,yy=>{let a=bar('Safety Checks',M+4,yy);a=Math.min(table(M+4,a,hw,c1,.7),table(M+16+hw,a,hw,c2,.7))-3;
+    a=bar('Breakdown',M+4,a);const b=Math.min(table(M+4,a,hw,[['Location of fault',o.faultLoc],...qrows([Q.bd[0]])],.7),table(M+16+hw,a,hw,qrows(Q.bd.slice(1)),.7))-3;
+    const w1=textBox(M+4,b,hw,[o.partsList?'Parts fitted: '+o.partsList:'',o.workDone].filter(Boolean).join('\n'),26);
+    const w2=textBox(M+16+hw,b,hw,o.partsReq?'Parts required: '+o.partsReq:'',26);return Math.min(w1,w2)});
+  const [a1,a2]=half(qrows(Q.adv));
+  y=section(y,yy=>{const a=bar('Appliance / system advice and recommendations',M+4,yy);
+    let b=Math.min(table(M+4,a,hw,a1,.7),table(M+16+hw,a,hw,a2,.7))-2;
+    for(const l of wrap('*Although regular servicing is essential, an audible Carbon Monoxide Alarm is an early warning device that keeps working 24 hours a day should an unforeseen event occur. Battery operated models have a limited lifespan; customers should check the expiry date periodically.',PW-2*M-10,6)){T(l,M+4,b-6,{size:6});b-=7}
+    return b-2});
+  y=section(y,yy=>{T('Engineer Comments',M+4,yy-9,{bold:true});const b=textBox(M+4,yy-12,(PW-2*M)/3-10,o.comments?'Please see the additional page for the engineer\'s comments':'',30);
+    const a=bar('Signatures',M+(PW-2*M)/3,yy);return Math.min(b,sigs(a,M+(PW-2*M)/3,(PW-2*M)*2/3-4))});
+
+  // ---- page 2: comments + photos ----
+  if(o.comments||(o.photos&&o.photos.length)){
+    y=header(o.reportType+' - Engineer Comments');
+    if(o.comments){y=bar('Comments',M,y);y=textBox(M,y,PW-2*M,o.comments,60,9)-10}
+    if(o.photos&&o.photos.length){y=bar('Photos',M,y);const pw=(PW-2*M-20)/3,ph=pw*.75;let col=0;
+      for(const p of o.photos){if(y-ph<M){y=header(o.reportType+' - Photos');col=0}
+        let img;try{img=p.startsWith('data:image/png')?await doc.embedPng(b64bytes(p)):await doc.embedJpg(b64bytes(p))}catch(e){continue}
+        const sc=Math.min(pw/img.width,ph/img.height);page.drawImage(img,{x:M+col*(pw+10),y:y-ph,width:img.width*sc,height:img.height*sc});
+        if(++col===3){col=0;y-=ph+10}}}
+  }
+
+  // ---- page 3: warning notice ----
+  if(o.unsafe){
+    const C={ID:['IMMEDIATELY DANGEROUS (ID)','The installation/appliance is an immediate danger to life or property. With your permission it has been disconnected. It must NOT be used or reconnected until the fault has been put right by a competent person.'],
+             AR:['AT RISK (AR)','One or more faults exist which could become a danger to life or property. With your permission the appliance has been turned off. It should not be used until the fault has been put right.'],
+             NCS:['NOT TO CURRENT STANDARDS (NCS)','The installation/appliance does not meet current standards but is not considered unsafe at this time. You are advised to have it brought up to current standards.']};
+    y=header('Warning / Advice Notice');
+    R(M,y-34,PW-2*M,34,{fill:RED});const h1=(isGas?'GAS':'ELECTRICAL')+' SAFETY WARNING - DO NOT USE';
+    T(h1,PW/2-FB.widthOfTextAtSize(h1,16)/2,y-18,{size:16,bold:true,color:WHITE});
+    const h2='This appliance has been found to be unsafe';T(h2,PW/2-FB.widthOfTextAtSize(h2,9)/2,y-29,{size:9,bold:true,color:WHITE});y-=42;
+    const bw=(PW-2*M-16)/3;
+    const boxes=[['Job Address',[o.siteName,o.siteAddr,o.sitePost].filter(Boolean).join('\n')],
+      ['Appliance',`${o.appType||''} - ${o.appMake||''} ${o.appModel||''}\nLocation: ${o.appLoc||''}\nSerial: ${o.appSerial||''}`],
+      ['Engineer',`${s.engName}, ${s.company}\n${isGas&&s.gasSafe?'Gas Safe Reg '+s.gasSafe+'  ID '+(s.idCard||'')+'\n':''}Tel ${s.coTel}`]];
+    let low=y;boxes.forEach(([l,t],i)=>{const a=bar(l,M+i*(bw+8),y);low=Math.min(low,textBox(M+i*(bw+8),a,bw,t,44))});y=low-8;
+    y=bar('Classification',M,y);low=y;
+    ['ID','AR','NCS'].forEach((k,i)=>{const on=o.cls===k,x=M+i*(bw+8);const lines=wrap(C[k][1],bw-10,7,on?FB:F);const h=lines.length*8.6+20;
+      R(x,y-h,bw,h,{fill:on?PINK:WHITE,stroke:on?RED:BLACK,bw:on?1.6:.6});R(x+5,y-13,8,8,{stroke:BLACK,bw:.6});if(on)T('X',x+6.3,y-11.8,{size:8,bold:true});
+      T(C[k][0],x+17,y-11.5,{bold:true});lines.forEach((t,j)=>T(t,x+5,y-22-j*8.6,{size:7,bold:on}));low=Math.min(low,y-h)});y=low-8;
+    const half2=(PW-2*M-10)/2;let a=bar('Reason the appliance is unsafe',M,y);const r1=textBox(M,a,half2,o.unsafeReason,80);
+    a=bar('Action taken',M+half2+10,y);
+    const acts=[['actOff','Appliance turned off'],['actDisc','Appliance disconnected / supply capped or isolated'],['actLabel','Warning label attached'],['actExplained','Situation explained and notice left with responsible person'],['actRefused','Responsible person refused permission to make safe'],['actEsp','Reported to Gas Emergency Service'],['actRiddor','RIDDOR report needed / made']];
+    const ah=Math.max(80,acts.length*10.5+6);R(M+half2+10,a-ah,half2,ah,{fill:WHITE,stroke:BLACK});
+    acts.forEach(([k,t],i)=>{const yy=a-12-i*10.5;R(M+half2+14,yy-1,7,7,{stroke:BLACK,bw:.6});if(o[k])T('X',M+half2+15.2,yy,{size:7,bold:true});T(t,M+half2+26,yy)});
+    y=Math.min(r1,a-ah)-8;
+    const notice='I confirm that, as the responsible person, the above has been explained to me and I have received this notice. Using this appliance after it has been classified as unsafe could endanger life or property and may be an offence.'+(isGas?' If you smell gas, call the Gas Emergency Service on 0800 111 999. To check a gas engineer, call Gas Safe Register on 0800 408 5500.':' Do not reconnect this appliance until it has been repaired by a competent person.');
+    y=textBox(M,y,PW-2*M,notice,20,8)-8;sigs(y,M,PW-2*M);
+  }
+  return await doc.save();
+}
+function pdfName(o){return W(`${o.reportType||'Report'} ${o.certNo||''} ${o.siteName||''}`).replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_')+'.pdf'}
+let madePdf=null;
+async function makePdf(){saveJob(false);pdfMsg.textContent='Making the PDF…';pdfActions.classList.add('hidden');
+  try{const bytes=await genPdf(job);const name=pdfName(job);madePdf=new File([bytes],name,{type:'application/pdf'});
+    if(pdfUrl.href.startsWith('blob:'))URL.revokeObjectURL(pdfUrl.href);pdfUrl.href=URL.createObjectURL(madePdf);pdfUrl.download=name;
+    const canShare=!!(navigator.canShare&&navigator.canShare({files:[madePdf]}));shareBtn.classList.toggle('hidden',!canShare);
+    pdfMsg.innerHTML=`✅ PDF ready: <b>${esc(name)}</b> (${Math.ceil(bytes.length/1024)} KB)`+(canShare?'<br>Tap <b>Send PDF</b> and choose Outlook or Mail – it will already be attached.':'<br>Tap <b>Download PDF</b>, then attach it to your email.');
+    pdfActions.classList.remove('hidden')}
+  catch(e){console.error(e);pdfMsg.innerHTML='⚠️ Couldn\'t make the PDF (it needs an internet connection the first time). Try again when you have signal.'}}
+async function sharePdf(){if(!madePdf)return;const o=job;
+  const text=mailBody(o);
+  try{await navigator.share({files:[madePdf],title:mailSubject(o),text})}
+  catch(e){if(e&&e.name!=='AbortError')pdfMsg.innerHTML+='<br>⚠️ Sharing didn\'t work here – use Download PDF instead.'}}
 
 // ---------- start ----------
 (function(){const all=store.get('bfm_jobs',{}),last=Object.values(all).sort((a,b)=>b.saved.localeCompare(a.saved))[0];
