@@ -1,0 +1,26 @@
+name: Upload to bfm-europe.co.uk
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Upload index.html by SFTP
+        env:
+          LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_DIR: ${{ secrets.FTP_DIR }}
+        run: |
+          lftp --env-password -u "$FTP_USERNAME" -p "$FTP_PORT" "sftp://$FTP_SERVER" \
+            -e "set sftp:auto-confirm yes; set net:max-retries 2; set net:timeout 30; cd \"$FTP_DIR\" && put index.html && ls; bye"
