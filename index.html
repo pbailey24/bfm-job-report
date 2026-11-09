@@ -187,7 +187,6 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
   <div id="gasChecks">
     <p class="help">Tap Yes / No / N/A for each one and put in the readings you took.</p>
     <div class="grid">
-      <div><label>Operating pressure (mbar)</label><input data-k="opPress" inputmode="decimal"></div>
       <div><label>Burner pressure (mbar)</label><input data-k="burnPress" inputmode="decimal"></div>
       <div><label>Tightness test</label><select data-k="tightness"><option></option><option>Pass</option><option>Fail</option><option>Not done</option></select></div>
     </div>
@@ -291,7 +290,7 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
   </div>
 </div>
 </details>
-<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.3</b> · 9 Nov 2026</p>
+<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.4</b> · 9 Nov 2026</p>
 </main>
 
 <div id="previewWrap"><div id="previewBar"><span>Report preview – scroll to check it</span><button class="btn" onclick="doPrint()">🖨 Print / Save PDF</button><button class="btn alt" onclick="previewWrap.classList.remove('show')">Close</button></div><div id="report"></div></div>
@@ -337,10 +336,10 @@ const nl=s=>esc(s).replace(/\n/g,'<br>');
 
 // ---------- Yes/No/NA question sets ----------
 const Q={
- gas:[['opCorrect','Appliance is operating correctly'],['conforms','Appliance conforms to current safety standards'],['flueSafe','Appliance flueing is safe'],['ventSafe','Appliance ventilation is safe'],['spillage','Flue flow / spillage test passed'],['burnerOk','Burner pressure correct'],['controls','Appliance / system controls checked / adjusted'],['noticeLeft','Safety warning / advice notice explained and left']],
- elec:[['visual','Visual inspection satisfactory'],['plugCable','Plug, cable and connections satisfactory'],['earthOk','Earth continuity test passed'],['insOk','Insulation resistance test passed'],['polarity','Polarity correct'],['opCorrectE','Appliance operating correctly'],['controlsE','Thermostat / controls checked'],['clearances','Clearances to combustibles satisfactory'],['noticeLeftE','Safety warning / advice notice explained and left']],
- bd:[['partFitted','Part fitted'],['faultResolved','Fault resolved'],['partsNeeded','Parts required']],
- adv:[['isSafe','Appliance is safe'],['replaceRec','Recommended appliance replacement – see advice'],['improveRec','System improvement(s) recommended – see advice'],['partsAvail','All functional parts available'],['coAlarm','Approved audible Carbon Monoxide Alarm fitted']]
+ gas:[['conforms','Appliance conforms to current safety standards'],['ventSafe','Appliance ventilation is safe'],['spillage','Flue flow / spillage test passed'],['noticeLeft','Safety warning / advice notice explained and left']],
+ elec:[['visual','Visual inspection satisfactory'],['plugCable','Plug, cable and connections satisfactory'],['earthOk','Earth continuity test passed'],['insOk','Insulation resistance test passed'],['polarity','Polarity correct'],['clearances','Clearances to combustibles satisfactory'],['noticeLeftE','Safety warning / advice notice explained and left']],
+ bd:[['partFitted','Part fitted'],['faultResolved','Fault resolved']],
+ adv:[['isSafe','Appliance is safe'],['coAlarm','Approved audible Carbon Monoxide Alarm fitted']]
 };
 function buildYnn(id,list){
   const el=document.getElementById(id);
@@ -433,7 +432,7 @@ function header(o,title,s){return`<div class="top"><div class="brand">${esc(s.co
 function buildReport(o){
   const s=S(),isGas=o.fuel!=='elec';
   const checks=isGas?Q.gas:Q.elec,[c1,c2]=half(checks),[a1,a2]=half(Q.adv);
-  const readings=isGas?[['Operating pressure (mbar)',o.opPress],['Burner pressure (mbar)',o.burnPress],['Tightness test',o.tightness]]
+  const readings=isGas?[['Burner pressure (mbar)',o.burnPress],['Tightness test',o.tightness]]
                       :[['Earth continuity (Ω)',o.earthR],['Insulation resistance (MΩ)',o.insR],['Fuse rating (A)',o.fuse],['Rated power (kW)',o.ratedKw]];
   let h=`<div class="rp">${header(o,o.reportType,s)}
   <div class="sec"><div class="cols3">
