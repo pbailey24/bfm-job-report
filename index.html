@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f3b57">
 <title>BFM Job Report</title>
 <style>
 :root{--navy:#1f3b57;--navy2:#2c5378;--bg:#eef1f4;--card:#fff;--line:#c9d1d9;--txt:#1b2733;--muted:#5d6b78;--red:#c0262d;--amber:#d98a00;--green:#2f7d3b}
@@ -54,6 +55,31 @@ textarea{min-height:90px;resize:vertical}
 .tag{font-size:12px;padding:2px 8px;border-radius:10px;background:#dfe6ec;margin-left:6px}
 .tag.r{background:var(--red);color:#fff}
 .hidden{display:none!important}
+/* ---------- dark mode ---------- */
+body.dark{--bg:#15191e;--card:#20262d;--line:#3b4550;--txt:#e8edf2;--muted:#a9b4bf;--navy:#2b4f73;--navy2:#5b8fc4}
+body.dark header.app{background:#0f1b27}
+body.dark input,body.dark select,body.dark textarea{background:#15191e;color:var(--txt);border-color:var(--line)}
+body.dark input[type=date]{color-scheme:dark}
+body.dark .help{background:#1a2833;color:#c3ced8}
+body.dark .loadbox{background:#1a2833}
+body.dark .ynn button,body.dark .tog button{background:#15191e;color:var(--txt);border-color:var(--line)}
+body.dark .tog button.on{background:var(--navy);border-color:var(--navy2);color:#fff}
+body.dark .btn.alt{background:transparent;color:#cfe0f1;border-color:#5b8fc4}
+body.dark label.btn.alt{color:#cfe0f1!important}
+body.dark .chk{border-color:#2c343c}
+body.dark .warnbox{background:#2a1a1c}
+body.dark .step>summary{color:var(--txt)}
+body.dark #joblist .job{background:var(--card)}
+body.dark dialog{background:var(--card);color:var(--txt)}
+body.dark input.found,body.dark textarea.found,body.dark select.found{background:#3a3315;border-color:#b8960c;color:#fff6d6}
+body.dark .actions{background:#15191eee}
+body.dark .sig{background:#fff}
+body.dark .photos img{border-color:var(--line)}
+body.dark a{color:#9cc6f0}
+header.app button.mode{padding:7px 9px;font-size:15px}
+body.dark div[style*="#eef"]{border-bottom-color:#2c343c!important}
+body.dark .chk span{color:var(--txt)}
+
 .loadbox{border:2px solid var(--navy2);border-radius:12px;padding:12px;background:#f3f7fb;margin-bottom:14px}
 .loadbox h3{margin:0 0 6px;font-size:17px}
 input.found,textarea.found,select.found{background:#fff7cc;border-color:#d9b400}
@@ -110,6 +136,7 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
 
 <header class="app">
   <h1>BFM Job Report</h1>
+  <button class="mode" id="modeBtn" onclick="toggleDark()" title="Dark / light">🌙</button>
   <button class="clr" onclick="clearJob()">🧹 Clear</button>
   <button onclick="showJobs()">Saved jobs</button>
   <button onclick="openSettings()">My details</button>
@@ -292,7 +319,7 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
   <p style="margin-top:14px"><button class="btn alt" onclick="printReport()">👁 Preview report on screen</button> <button class="btn alt" onclick="emailReport()">✉️ Email without PDF</button></p>
 </div>
 </details>
-<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.9</b> · 9 Nov 2026</p>
+<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.10</b> · 9 Nov 2026</p>
 </main>
 
 <div id="previewWrap"><div id="previewBar"><span>Report preview – scroll to check it</span><button class="btn" onclick="doPrint()">🖨 Print / Save PDF</button><button class="btn alt" onclick="previewWrap.classList.remove('show')">Close</button></div><div id="report"></div></div>
@@ -723,6 +750,12 @@ async function sharePdf(){if(!madePdf)return;const o=job;
 function grow(el){el.style.height='auto';el.style.height=Math.max(el.scrollHeight+2,70)+'px'}
 document.querySelectorAll('#form textarea').forEach(el=>el.addEventListener('input',()=>grow(el)));
 function growAll(){document.querySelectorAll('#form textarea').forEach(grow)}
+
+// ---------- dark mode ----------
+function applyDark(on){document.body.classList.toggle('dark',on);modeBtn.textContent=on?'☀️':'🌙';
+  const m=document.querySelector('meta[name=theme-color]');if(m)m.content=on?'#0f1b27':'#1f3b57'}
+function toggleDark(){const on=!document.body.classList.contains('dark');applyDark(on);store.set('bfm_dark',on)}
+(function(){let pref=store.get('bfm_dark',null);if(pref===null){try{pref=matchMedia('(prefers-color-scheme: dark)').matches}catch(e){pref=false}}applyDark(!!pref)})();
 // ---------- start ----------
 (function(){const all=store.get('bfm_jobs',{}),cur=store.get('bfm_cur',null),last=Object.values(all).sort((a,b)=>b.saved.localeCompare(a.saved))[0];
   if(cur&&cur.draft){job=cur.draft;fill(cur.draft)}else if(cur&&cur.id&&all[cur.id]){job=all[cur.id];fill(job)}else if(last){job=last;fill(last)}else{startBlank();saveJob(false)}
