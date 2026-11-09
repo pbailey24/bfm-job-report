@@ -292,7 +292,7 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
   <p style="margin-top:14px"><button class="btn alt" onclick="printReport()">👁 Preview report on screen</button> <button class="btn alt" onclick="emailReport()">✉️ Email without PDF</button></p>
 </div>
 </details>
-<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.8</b> · 9 Nov 2026</p>
+<p style="text-align:center;color:#7a8691;font-size:13px;margin:20px 0 40px">BFM Job Report · <b>v1.9</b> · 9 Nov 2026</p>
 </main>
 
 <div id="previewWrap"><div id="previewBar"><span>Report preview – scroll to check it</span><button class="btn" onclick="doPrint()">🖨 Print / Save PDF</button><button class="btn alt" onclick="previewWrap.classList.remove('show')">Close</button></div><div id="report"></div></div>
@@ -727,6 +727,13 @@ function growAll(){document.querySelectorAll('#form textarea').forEach(grow)}
 (function(){const all=store.get('bfm_jobs',{}),cur=store.get('bfm_cur',null),last=Object.values(all).sort((a,b)=>b.saved.localeCompare(a.saved))[0];
   if(cur&&cur.draft){job=cur.draft;fill(cur.draft)}else if(cur&&cur.id&&all[cur.id]){job=all[cur.id];fill(job)}else if(last){job=last;fill(last)}else{startBlank();saveJob(false)}
   if(!S().gasSafe)setTimeout(()=>toast('Tap “My details” to add your Gas Safe number'),800)})();
+// ---------- job sheet sent from the iPhone Share menu (Shortcut) ----------
+function takeSheetFromLink(){const h=location.hash||'';if(!h.startsWith('#sheet='))return;
+  let text='';try{text=decodeURIComponent(h.slice(7).replace(/\+/g,' '))}catch(e){text=h.slice(7)}
+  try{history.replaceState(null,'',location.pathname+location.search)}catch(e){location.hash=''}
+  const cur=collect();if(hasContent(cur)){saveJob(false);startBlank()}
+  loadSheetText(text,'the Share menu');window.scrollTo(0,0)}
+takeSheetFromLink();window.addEventListener('hashchange',takeSheetFromLink);
 </script>
 </body>
 </html>
