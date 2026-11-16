@@ -351,12 +351,21 @@ dialog{border:0;border-radius:12px;max-width:600px;width:94%}
     <div><label>Next cert. no.</label><input data-s="nextCert" inputmode="numeric"></div>
     <div><label>Always send copy to (office email)</label><input data-s="officeEmail" type="email"></div>
   </div>
+  <h3 style="margin:18px 0 6px">☁️ OneDrive</h3>
+  <p class="help">Jobs and finished reports are saved to <b>BFM Job Reports</b> in your BFM OneDrive, so they're on every device.</p>
+  <div id="odStatus" style="font-size:15px;margin:6px 0"></div>
+  <div class="row"><button class="btn" type="button" id="odInBtn" onclick="odSignIn()">Sign in to OneDrive</button><button class="btn alt" type="button" id="odOutBtn" onclick="odSignOut()">Sign out</button></div>
+  <details style="margin-top:8px"><summary style="font-size:14px;cursor:pointer">Set-up (only needed once)</summary>
+  <div class="grid" style="margin-top:6px">
+    <div><label>App (client) ID</label><input data-s="msClientId" placeholder="from the Azure app registration"></div>
+    <div><label>Tenant / domain</label><input data-s="msTenant" placeholder="bfm-europe.com"></div>
+  </div></details>
   <div class="row" style="margin-top:14px"><button class="btn" onclick="saveSettings()">Save</button><button class="btn alt" onclick="settingsDlg.close()">Cancel</button></div>
 </dialog>
 
 <dialog id="jobsDlg">
   <h2>Saved jobs</h2>
-  <p class="help">Jobs are kept on this phone or computer. Tap “Open” to carry on with one.</p>
+  <p class="help">Tap “Open” to carry on with one. <span id="jobsCloudMsg"></span></p>
   <div id="joblist"></div>
   <div class="row" style="margin-top:10px"><button class="btn alt" onclick="jobsDlg.close()">Close</button></div>
 </dialog>
@@ -444,27 +453,145 @@ function sigData(id){return sigs[id].isBlank()?'':sigs[id].c.toDataURL('image/pn
 function loadSig(id,d){clearSig(id);if(!d)return;const s=sigs[id],i=new Image();i.onload=()=>{s.ctx.drawImage(i,0,0,s.c.width,s.c.height);s.setBlank(false)};i.src=d}
 
 // ---------- jobs ----------
-function saveJob(show){job=collect();if(hasContent(job)){const all=store.get('bfm_jobs',{});all[job.id]=job;store.set('bfm_jobs',all);store.set('bfm_cur',{id:job.id})}else store.set('bfm_cur',{draft:job});if(show)toast(hasContent(job)?'Job saved':'Nothing to save yet')}
+function saveJob(show){job=collect();if(hasContent(job)){const all=store.get('bfm_jobs',{});const prev=all[job.id];all[job.id]=job;store.set('bfm_jobs',all);store.set('bfm_cur',{id:job.id});if(!prev||jobSig(prev)!==jobSig(job))odQueue(job.id,show)}else store.set('bfm_cur',{draft:job});if(show)toast(hasContent(job)?'Job saved':'Nothing to save yet')}
 function ask(m,cb){askMsg.textContent=m;askYes.onclick=()=>{askDlg.close();cb()};askDlg.showModal()}
 function hasContent(o){return!!(o.siteName||o.jobRef||o.comments||o.siteAddr||o.appMake||o.sigEng||(o.photos&&o.photos.length))}
 function clearJob(){clearDlg.showModal()}
 function doClear(del){clearDlg.close();const cur=collect();
   const all=store.get('bfm_jobs',{});
-  if(del||!hasContent(cur)){delete all[cur.id];store.set('bfm_jobs',all)}else{all[cur.id]=cur;store.set('bfm_jobs',all)}
+  if(del||!hasContent(cur)){delete all[cur.id];store.set('bfm_jobs',all);if(del)odDelete(cur.id)}else{all[cur.id]=cur;store.set('bfm_jobs',all);odQueue(cur.id)}
   const reuse=!hasContent(cur)||del;startBlank(reuse?cur.certNo:null);saveJob(false);window.scrollTo(0,0);toast(del?'Job deleted – form cleared':'Form cleared')}
 function newJob(){ask('Start a new job? This one will be saved first.',()=>{saveJob(false);startBlank();saveJob(false);toast('New job started')})}
 function startBlank(reuseCert){madePdf=null;pdfActions&&pdfActions.classList.add('hidden');pdfMsg&&(pdfMsg.textContent='');const s=S();job={};document.querySelectorAll('.found').forEach(e=>e.classList.remove('found'));sheetMsg.textContent='';if(reuseCert){fill({date:new Date().toISOString().slice(0,10),certNo:reuseCert,reportType:'Gas Breakdown Record'});return}
   fill({date:new Date().toISOString().slice(0,10),certNo:s.nextCert,reportType:'Gas Breakdown Record'});
   s.nextCert=String((parseInt(s.nextCert)||1000)+1);store.set('bfm_settings',s);window.scrollTo(0,0)}
-function showJobs(){saveJob(false);const all=Object.values(store.get('bfm_jobs',{})).filter(hasContent).sort((a,b)=>b.saved.localeCompare(a.saved));
-  joblist.innerHTML=all.length?all.map(j=>`<div class="job"><div><b>Cert ${esc(j.certNo)}</b> ${j.unsafe?'<span class="tag r">UNSAFE</span>':''}<span class="tag">${j.fuel==='elec'?'Electric':'Gas'}</span><br>${esc(j.siteName)} ${esc(j.sitePost)}<br><small>${esc(j.date)} · ${esc(j.appMake)} ${esc(j.appModel)}</small></div><button class="btn alt" onclick="openJob('${j.id}')">Open</button><button class="btn red" onclick="delJob('${j.id}')">🗑</button></div>`).join(''):'<p>No saved jobs yet.</p>';
-  jobsDlg.showModal()}
-function openJob(id){const j=store.get('bfm_jobs',{})[id];if(!j)return;job=j;fill(j);store.set('bfm_cur',{id});jobsDlg.close();toast('Job opened')}
-function delJob(id){jobsDlg.close();ask('Delete this job? This cannot be undone.',()=>{const all=store.get('bfm_jobs',{});delete all[id];store.set('bfm_jobs',all);if(job.id===id)job={};showJobs()})}
+function drawJobs(cloud){const local=store.get('bfm_jobs',{}),pend=odPending();const list={};
+  Object.values(local).filter(hasContent).forEach(j=>list[j.id]={...j,_where:pend.includes(j.id)?'wait':(cloud&&cloud[j.id]?'both':'phone')});
+  if(cloud)for(const[id,c]of Object.entries(cloud)){if(!list[id])list[id]={...c,id,_where:'cloud'};else if((c.saved||'')>(list[id].saved||'')&&!pend.includes(id))list[id]={...c,id,_where:'newer'}}
+  const all=Object.values(list).sort((a,b)=>(b.saved||'').localeCompare(a.saved||''));
+  const badge={both:'<span class="tag">☁️ in OneDrive</span>',wait:'<span class="tag">📱 waiting to upload</span>',phone:'<span class="tag">📱 this device only</span>',cloud:'<span class="tag">☁️ OneDrive only</span>',newer:'<span class="tag">☁️ newer in OneDrive</span>'};
+  joblist.innerHTML=all.length?all.map(j=>`<div class="job"><div><b>Cert ${esc(j.certNo)}</b> ${j.unsafe?'<span class="tag r">UNSAFE</span>':''}<span class="tag">${j.fuel==='elec'?'Electric':'Gas'}</span>${badge[j._where]||''}<br>${esc(j.siteName)} ${esc(j.sitePost)}<br><small>${esc(j.date)} · ${esc(j.appMake)} ${esc(j.appModel)}</small></div><button class="btn alt" onclick="openJob('${esc(j.id)}')">Open</button><button class="btn red" onclick="delJob('${esc(j.id)}')">🗑</button></div>`).join(''):'<p>No saved jobs yet.</p>'}
+async function showJobs(){saveJob(false);drawJobs(null);jobsDlg.showModal();
+  if(!odReady()){jobsCloudMsg.textContent=odConfigured()?'Not signed in to OneDrive – jobs are only on this device (sign in under My details).':'';return}
+  jobsCloudMsg.textContent='Checking OneDrive…';
+  try{await odFlush();const idx=await odIndex();drawJobs(idx);jobsCloudMsg.textContent='☁️ Showing jobs from this device and OneDrive.'}
+  catch(e){console.error(e);jobsCloudMsg.textContent='⚠️ Couldn\'t reach OneDrive just now – showing jobs on this device.'}}
+async function openJob(id){const all=store.get('bfm_jobs',{});let j=all[id];
+  const row=[...joblist.querySelectorAll('.job')].find(r=>r.innerHTML.includes(`openJob('${id}')`));
+  const remote=row&&/OneDrive only|newer in OneDrive/.test(row.textContent);
+  if(remote||!j){try{toast('Getting job from OneDrive…');const c=await odGetJob(id);if(c){j=c;all[id]=c;store.set('bfm_jobs',all)}}catch(e){console.error(e);if(!j){toast('Couldn\'t get that job from OneDrive');return}}}
+  if(!j)return;job=j;fill(j);store.set('bfm_cur',{id});jobsDlg.close();toast('Job opened')}
+function delJob(id){jobsDlg.close();ask('Delete this job? (A copy stays in the OneDrive recycle bin for a while.)',()=>{const all=store.get('bfm_jobs',{});delete all[id];store.set('bfm_jobs',all);odDelete(id);if(job.id===id)job={};showJobs()})}
 setInterval(()=>saveJob(false),30000);
 
+// ---------- OneDrive (BFM Microsoft 365) ----------
+// Jobs are saved to OneDrive > BFM Job Reports > Jobs, finished PDFs to BFM Job Reports > Reports > yyyy-mm.
+// The phone keeps its own copy too, so it still works with no signal and uploads when it can.
+const OD_CLIENT_ID=''; // the Azure "Application (client) ID" can go here, or in My details > Set-up
+const OD_FOLDER='BFM Job Reports';
+const OD_SCOPES='offline_access User.Read Files.ReadWrite';
+const G='https://graph.microsoft.com/v1.0';
+const odCfg=()=>{const s=S();return{id:(s.msClientId||OD_CLIENT_ID||'').trim(),tenant:(s.msTenant||'bfm-europe.com').trim()}};
+const odConfigured=()=>!!odCfg().id;
+const odTok=()=>store.get('bfm_od_tok',null);
+const odReady=()=>odConfigured()&&!!(odTok()&&odTok().refresh);
+const odRedirect=()=>location.origin+location.pathname;
+const odAuthUrl=p=>`https://login.microsoftonline.com/${encodeURIComponent(odCfg().tenant)}/oauth2/v2.0/${p}`;
+const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+function jobSig(o){const {saved,...r}=o||{};return JSON.stringify(r)}
+const odSummary=j=>({certNo:j.certNo,siteName:j.siteName,sitePost:j.sitePost,date:j.date,appMake:j.appMake,appModel:j.appModel,fuel:j.fuel,unsafe:j.unsafe,reportType:j.reportType,jobRef:j.jobRef,saved:j.saved});
+function saveSettingsQuiet(){const s=S();document.querySelectorAll('[data-s]').forEach(i=>s[i.dataset.s]=i.value);store.set('bfm_settings',s)}
+
+// sign in (Microsoft login page, then back here)
+async function odSignIn(){saveSettingsQuiet();
+  if(!odConfigured()){toast('Put the App (client) ID in Set-up first');return}
+  if(!window.crypto||!crypto.subtle){toast('Sign-in needs the https:// web address');return}
+  saveJob(false);
+  const v=b64u(crypto.getRandomValues(new Uint8Array(48))),st=b64u(crypto.getRandomValues(new Uint8Array(16)));
+  const ch=b64u(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)));
+  store.set('bfm_od_pkce',{v,st,r:odRedirect()});
+  const q=new URLSearchParams({client_id:odCfg().id,response_type:'code',redirect_uri:odRedirect(),response_mode:'query',scope:OD_SCOPES,state:st,code_challenge:ch,code_challenge_method:'S256'});
+  location.href=odAuthUrl('authorize')+'?'+q}
+function odSignOut(){store.set('bfm_od_tok',null);odShowStatus();toast('Signed out of OneDrive')}
+async function odTokenReq(body){
+  const r=await fetch(odAuthUrl('token'),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:odCfg().id,scope:OD_SCOPES,...body})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok)throw Object.assign(new Error(d.error_description||d.error||('sign-in error '+r.status)),{code:d.error||''});
+  const old=odTok()||{};const t={access:d.access_token,refresh:d.refresh_token||old.refresh,exp:Date.now()+((d.expires_in||3600)-120)*1000,user:old.user};
+  store.set('bfm_od_tok',t);return t}
+async function odHandleRedirect(){const u=new URL(location.href),code=u.searchParams.get('code'),err=u.searchParams.get('error');if(!code&&!err)return;
+  const pk=store.get('bfm_od_pkce',null);
+  try{history.replaceState(null,'',location.pathname+location.hash)}catch(e){}
+  if(err){console.warn(u.searchParams.get('error_description'));toast(err==='access_denied'?'OneDrive sign-in cancelled':'OneDrive sign-in problem: '+err);return}
+  if(!pk||pk.st!==u.searchParams.get('state')){toast('Sign-in didn\'t match – please try again');return}
+  try{await odTokenReq({grant_type:'authorization_code',code,redirect_uri:pk.r,code_verifier:pk.v});store.set('bfm_od_pkce',null);
+    try{const me=await odApi('GET','/me?$select=mail,userPrincipalName');const t=odTok();t.user=me.mail||me.userPrincipalName;store.set('bfm_od_tok',t)}catch(e){}
+    toast('✅ Connected to OneDrive – uploading your jobs');odQueueAll();await odFlush()}
+  catch(e){console.error(e);toast('OneDrive sign-in failed: '+e.message)}}
+let odRefreshing=null,odWarned=false;
+async function odToken(){const t=odTok();if(!t||!t.refresh)throw Object.assign(new Error('Not signed in to OneDrive'),{code:'signin'});
+  if(t.access&&Date.now()<t.exp)return t.access;
+  if(!odRefreshing)odRefreshing=odTokenReq({grant_type:'refresh_token',refresh_token:t.refresh}).finally(()=>odRefreshing=null);
+  try{return(await odRefreshing).access}
+  catch(e){if(/invalid_grant|interaction_required|invalid_client/.test(e.code||'')){store.set('bfm_od_tok',{...t,refresh:null,access:null});
+      if(!odWarned){odWarned=true;toast('OneDrive needs you to sign in again – My details › Sign in')}}throw e}}
+
+// talking to OneDrive
+const odPath=p=>'/me/drive/root:/'+[OD_FOLDER,...p.split('/')].map(encodeURIComponent).join('/');
+async function odApi(method,url,body,headers={}){
+  const r=await fetch(url.startsWith('http')?url:G+url,{method,headers:{Authorization:'Bearer '+await odToken(),...headers},body});
+  if(r.status===404&&method==='GET')return null;
+  if(!r.ok){let m='';try{m=(await r.json()).error.message}catch(e){}throw Object.assign(new Error(m||('OneDrive error '+r.status)),{status:r.status})}
+  if(r.status===204)return{};return(r.headers.get('content-type')||'').includes('json')?r.json():r.text()}
+async function odPut(path,data,type){const blob=data instanceof Blob?data:new Blob([data],{type});
+  if(blob.size<3.5e6)return odApi('PUT',odPath(path)+':/content',blob,{'Content-Type':type||blob.type||'application/octet-stream'});
+  const ses=await odApi('POST',odPath(path)+':/createUploadSession',JSON.stringify({item:{'@microsoft.graph.conflictBehavior':'replace'}}),{'Content-Type':'application/json'});
+  const CH=327680*10;let r;
+  for(let i=0;i<blob.size;i+=CH){const part=blob.slice(i,i+CH);
+    r=await fetch(ses.uploadUrl,{method:'PUT',headers:{'Content-Range':`bytes ${i}-${i+part.size-1}/${blob.size}`},body:part});
+    if(!r.ok)throw new Error('Upload failed '+r.status)}
+  return r.json()}
+async function odGetJson(path){const it=await odApi('GET',odPath(path));if(!it||!it['@microsoft.graph.downloadUrl'])return null;
+  const r=await fetch(it['@microsoft.graph.downloadUrl']);if(!r.ok)throw new Error('Download failed '+r.status);return r.json()}
+const odIndex=async()=>(await odGetJson('Jobs/index.json'))||{};
+const odGetJob=id=>odGetJson('Jobs/'+id+'.json');
+
+// upload queue (kept on the phone so nothing is lost with no signal)
+const odPending=()=>store.get('bfm_od_pend',[]),odDeleted=()=>store.get('bfm_od_del',[]);
+let odBusy=null,odTimer=null;
+function odQueue(id,now){if(!odConfigured()||!id)return;const p=odPending();if(!p.includes(id)){p.push(id);store.set('bfm_od_pend',p)}
+  clearTimeout(odTimer);odTimer=setTimeout(odFlush,now?300:8000)}
+function odQueueAll(){const all=store.get('bfm_jobs',{});store.set('bfm_od_pend',Object.keys(all).filter(k=>hasContent(all[k])))}
+function odDelete(id){if(!odConfigured()||!id)return;store.set('bfm_od_pend',odPending().filter(x=>x!==id));
+  const d=odDeleted();if(!d.includes(id)){d.push(id);store.set('bfm_od_del',d)}clearTimeout(odTimer);odTimer=setTimeout(odFlush,300)}
+function odFlush(){if(!odReady()||!navigator.onLine)return Promise.resolve();if(odBusy)return odBusy;
+  odBusy=(async()=>{const p=odPending(),d=odDeleted();if(!p.length&&!d.length)return;
+    const idx=await odIndex();let changed=false;
+    for(const id of d){await odApi('DELETE',odPath('Jobs/'+id+'.json')).catch(e=>{if(e.status!==404)throw e});
+      delete idx[id];changed=true;store.set('bfm_od_del',odDeleted().filter(x=>x!==id))}
+    for(const id of p){const j=store.get('bfm_jobs',{})[id];
+      if(j&&hasContent(j)){const sent=jobSig(j);await odPut('Jobs/'+id+'.json',JSON.stringify(j),'application/json');idx[id]=odSummary(j);changed=true;
+        const now=store.get('bfm_jobs',{})[id];if(now&&jobSig(now)!==sent)continue}
+      store.set('bfm_od_pend',odPending().filter(x=>x!==id))}
+    if(changed)await odPut('Jobs/index.json',JSON.stringify(idx),'application/json')
+  })().catch(e=>console.warn('OneDrive upload',e)).finally(()=>{odBusy=null;odShowStatus()});
+  return odBusy}
+function odSavePdf(file,o){if(!odReady()||!file)return;const ym=(o.date||new Date().toISOString()).slice(0,7);
+  odPut('Reports/'+ym+'/'+file.name,file,'application/pdf')
+    .then(()=>{pdfMsg.innerHTML+='<br>☁️ A copy of the PDF is saved in OneDrive (BFM Job Reports › Reports).'})
+    .catch(e=>{console.warn(e);pdfMsg.innerHTML+='<br>⚠️ The PDF didn\'t save to OneDrive (no signal?). Tap Make PDF again later to save a copy.'})}
+function odShowStatus(){const el=document.getElementById('odStatus');if(!el)return;const t=odTok()||{},n=odPending().length;
+  el.innerHTML=!odConfigured()?'⚙️ Not set up yet – add the App (client) ID under “Set-up”, then tap Sign in.'
+    :odReady()?`✅ Connected${t.user?' as <b>'+esc(t.user)+'</b>':''}. `+(n?`📱 ${n} job${n>1?'s':''} waiting to upload.`:'Everything is saved to OneDrive.')
+    :'❌ Not signed in – jobs are only saved on this device.';
+  odInBtn.classList.toggle('hidden',odReady());odOutBtn.classList.toggle('hidden',!odReady())}
+window.addEventListener('online',()=>odFlush());
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){saveJob(false);odFlush()}});
+setInterval(()=>odFlush(),60000);
+odHandleRedirect().then(()=>odFlush());
+
 // settings
-function openSettings(){const s=S();document.querySelectorAll('[data-s]').forEach(i=>i.value=s[i.dataset.s]??'');settingsDlg.showModal()}
+function openSettings(){const s=S();document.querySelectorAll('[data-s]').forEach(i=>i.value=s[i.dataset.s]??'');odShowStatus();settingsDlg.showModal()}
 function saveSettings(){const s=S();document.querySelectorAll('[data-s]').forEach(i=>s[i.dataset.s]=i.value);store.set('bfm_settings',s);settingsDlg.close();toast('Details saved')}
 
 // ---------- report ----------
@@ -806,7 +933,7 @@ async function makePdf(){saveJob(false);pdfMsg.textContent='Making the PDF…';p
     if(pdfUrl.href.startsWith('blob:'))URL.revokeObjectURL(pdfUrl.href);pdfUrl.href=URL.createObjectURL(madePdf);pdfUrl.download=name;
     const canShare=!!(navigator.canShare&&navigator.canShare({files:[madePdf]}));shareBtn.classList.toggle('hidden',!canShare);
     pdfMsg.innerHTML=`✅ PDF ready: <b>${esc(name)}</b> (${Math.ceil(bytes.length/1024)} KB)`+(canShare?'<br>Tap <b>Send PDF</b> and choose Outlook or Mail – it will already be attached.':'<br>Tap <b>Download PDF</b>, then attach it to your email.');
-    pdfActions.classList.remove('hidden')}
+    pdfActions.classList.remove('hidden');odSavePdf(madePdf,job)}
   catch(e){console.error(e);pdfMsg.innerHTML='⚠️ Couldn\'t make the PDF (it needs an internet connection the first time). Try again when you have signal.'}}
 async function sharePdf(){if(!madePdf)return;const o=job;
   const text=mailBody(o);
