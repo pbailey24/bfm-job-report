@@ -569,7 +569,7 @@ function parseEmailText(t){
   m=t.match(/Call\s+(\d{4,6})\s+@\s+([^\n]+)/i);if(m){r.jobRef=r.jobRef||m[1];r.siteName=r.siteName||fixCase(m[2].trim())}
   return common(t,r)}
 function parsePdfText(t){
-  const r={};t=t.replace(/\s+/g,' ');let m;
+  const raw=t,r={};t=t.replace(/\s+/g,' ');let m;
   const PC='([A-Z]{1,2}\\d[A-Z\\d]?\\s*\\d[A-Z]{2})\\b';
   // job number
   m=t.match(/Job Number:?\s*(\d{4,6})\b/i)||t.match(/Address:?\s*(\d{4,6})\s/)||t.match(/\b(\d{5})\b/);if(m)r.jobRef=m[1];
@@ -602,7 +602,71 @@ function parsePdfText(t){
   const ser=cands.find(c=>c!==r.productCode&&(c.match(/\d/g)||[]).length>=c.length/2);if(ser)r.appSerial=ser;
   m=t.match(/Install Date:?\s*(\d{2}\/\d{2}\/\d{4})/i)||t.match(/(\d{2}\/\d{2}\/\d{4})\s*Install Date/i);if(m)r.installDate=m[1];
   m=t.match(/Scheduled Arrival:?\s*(\d{2}\/\d{2}\/\d{4}\s*\d{2}:\d{2})/i);if(m)r.appt=m[1];
+  if(r.appSerial&&!goodSerial(r.appSerial))delete r.appSerial;
+  sheetLines(raw,t,r);
   return common(t,r)}
+// ---- second pass: works on the line layout the iPhone Share menu gives us ----
+// (the iPhone often reads the sheet row by row, so "Address: 7 Street  Call Ref Number:" and
+//  "Claypit Lane  Call Logger: nadams" come out on the same line)
+const SHEET_LABELS=['Job Number','Area Code','Call Type','Status','Site Name','Address','Call In Date','Call Ref Number','Call Logger','Contact','Phone','Email','Serial No','Install Date','Engineer Name','Product','Scheduled Arrival','Problem','Fault','Repair','Date Attended','Job Notes','Part Number','Description','Charge','Quantity','Total','Call Details','Field Report Details','Service Job Sheet'];
+const LBL_RE=new RegExp('\\b(?:'+SHEET_LABELS.map(x=>x.replace(/ /g,'\\s+')).join('|')+')\\b:?','i');
+const RIGHT_COL=/\s*\b(?:Call In Date|Call Ref Number|Call Logger|Contact|Phone|Email|Engineer Name|Scheduled Arrival|Date Attended|Install Date|Status|Area Code|Call Type)\b:?.*$/i;
+const isLabelOnly=s=>!s.replace(new RegExp(LBL_RE.source,'gi'),'').replace(/[\s:]+/g,'');
+const goodSerial=s=>!!s&&/\d{4,}/.test(s)&&!/^\d{2}\/\d{2}\/\d{4}$/.test(s)&&!/^0\d{9,10}$/.test(s)&&!LBL_RE.test(s);
+function afterLabel(line,label){const m=line.match(new RegExp('\\b'+label.replace(/ /g,'\\s+')+'\\b:?\\s*(.*)$','i'));if(!m)return null;
+  return m[1].replace(RIGHT_COL,'').trim()}
+function sheetLines(raw,flat,r){
+  const PCre=/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/;
+  const L=(raw||'').split('\n').map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
+  let name='',addr=[],post='';
+  if(L.length>3){
+    // site name
+    let i=L.findIndex(x=>/\bSite Name\b/i.test(x));
+    if(i>=0){name=afterLabel(L[i],'Site Name')||'';
+      if(!name||isLabelOnly(name)){name='';for(let k=i+1;k<L.length&&k<i+15;k++){const v=L[k].replace(RIGHT_COL,'').trim();if(v&&!LBL_RE.test(v)){name=v;break}}}}
+    // address: from "Address:" down to the post code, keeping only the left-hand column
+    i=L.findIndex(x=>/(^|\s)Address\b:?/i.test(x)&&!/Email Address/i.test(x));
+    if(i>=0){const first=afterLabel(L[i],'Address');if(first&&!isLabelOnly(first))addr.push(first);
+      for(let k=i+1;k<L.length&&k<i+20&&!post;k++){
+        let v=L[k];const pcm=v.match(PCre);
+        if(pcm){const before=v.slice(0,pcm.index).replace(RIGHT_COL,'').trim();if(before&&!LBL_RE.test(before))addr.push(before);post=pcm[1];break}
+        v=v.replace(RIGHT_COL,'').trim();
+        if(!v||LBL_RE.test(v)||/^\d{2}\/\d{2}\/\d{4}/.test(v)||/^0\d{9,10}$/.test(v.replace(/\s/g,''))||/@/.test(v)||/^[a-z][a-z0-9._-]*$/.test(v))continue;
+        addr.push(v)}
+      // first address-ish line was really the name (labels all came first, then the values)
+      if(addr.length&&name&&addr[0].toUpperCase()===name.toUpperCase())addr.shift();
+      if(addr.length&&!name&&/^(Mr|Mrs|Ms|Miss|Dr|Mr\s*&\s*Mrs)\b/i.test(addr[0]))name=addr.shift()}
+    // problem text: "Problem:" down to "Field Report Details"
+    i=L.findIndex(x=>/\bProblem\b:/i.test(x));
+    if(i>=0){const out=[];const f=afterLabel(L[i],'Problem');if(f)out.push(f);
+      for(let k=i+1;k<L.length&&!/Field Report|Engineer Name|Job Notes|Part Number/i.test(L[k]);k++)if(!isLabelOnly(L[k]))out.push(L[k]);
+      if(out.length)r.reported=out.join('\n')}
+    // serial no
+    i=L.findIndex(x=>/\bSerial No\b/i.test(x));
+    if(i>=0&&!r.appSerial){let v=(afterLabel(L[i],'Serial No')||'').split(' ')[0];
+      if(!goodSerial(v)){const b=L[i].match(/([A-Z0-9]{5,})\s+Serial No/);v=b?b[1]:''}
+      if(!goodSerial(v))for(let k=i+1;k<L.length&&k<i+8;k++){const w=L[k].replace(RIGHT_COL,'').trim().split(' ')[0];if(goodSerial(w)){v=w;break}}
+      if(goodSerial(v))r.appSerial=v}
+  }
+  // call type (any short code, e.g. CER)
+  if(!r.callType){const ct=flat.match(/Call Type:?\s*([A-Z]{2,4})\b/);if(ct&&!/^(OPEN|STAT)/.test(ct[1]))r.callType=CALLTYPES[ct[1]]||ct[1]}
+  // one-line text: name after "Site Name:", problem between "Problem:" and "Field Report"
+  if(!name&&!r.siteName){const sn=flat.match(/Site Name:?\s*(.+?)\s*(?=\b(?:Call In Date|Address|Call Ref Number|Call Logger|Contact|Phone|Email)\b|$)/i);if(sn&&sn[1]&&!LBL_RE.test(sn[1])&&sn[1].length<60)name=sn[1]}
+  if(L.length<=3){const pr=flat.match(/Problem:?\s*(.+?)\s*(?:Field Report|Engineer Name:|Job Notes|Part Number|$)/i);if(pr&&pr[1]&&!isLabelOnly(pr[1]))r.reported=pr[1].trim()}
+  // everything on one line: cut the right-hand column labels (and their values) out of the address
+  if(!addr.length&&!r.siteAddr){const a=flat.search(/(?:^|\s)Address:?\s/);
+    if(a>=0){let seg=flat.slice(a).replace(/^\s*Address:?\s*/,'');const pcm=seg.match(PCre);
+      if(pcm&&pcm.index<250){post=pcm[1];seg=seg.slice(0,pcm.index)
+        .replace(/Call In Date:?\s*(\d{2}\/\d{2}\/\d{4})?/gi,' ').replace(/Call Ref Number:?/gi,' ')
+        .replace(/Call Logger:?\s*([a-z][a-z0-9._-]*\b)?/g,' ').replace(/Contact:?/gi,' ')
+        .replace(/Phone:?\s*(0[\d ]{9,12}\d)?/gi,' ').replace(/Email:?\s*(\S+@\S+)?/gi,' ').replace(/\s+/g,' ').trim();
+        if(seg&&!LBL_RE.test(seg)){if(name&&seg.toUpperCase().startsWith(name.toUpperCase()))seg=seg.slice(name.length).trim();addr=[splitAddr(seg)]}}}}
+  if(!name&&!r.siteName){const nm=flat.match(/\b((?:Mr\s*&\s*Mrs|Mrs|Mr|Ms|Miss|Dr)\.?\s+[^\d:]+?)\s+(?=\d)/);if(nm&&nm[1].length<50&&!LBL_RE.test(nm[1]))name=nm[1]}
+  if(name&&!LBL_RE.test(name))r.siteName=fixCase(name);
+  if(addr.length){r.siteAddr=addr.join('\n');if(post)r.sitePost=post}
+  if(r.siteAddr&&LBL_RE.test(r.siteAddr))delete r.siteAddr;
+  if(r.reported&&isLabelOnly(r.reported))delete r.reported;
+  return r}
 function splitAddr(a){ // put town / county on new lines where we can
   return a.replace(/\s+(?=(?:West Midlands|Staffordshire|Cheshire|Shropshire|Derbyshire|Greater Manchester|Lancashire|Yorkshire|West Yorkshire|South Yorkshire|Merseyside|Worcestershire|Warwickshire|Leicestershire|Nottinghamshire|Stoke-on-Trent|Wolverhampton|Birmingham|Stafford|Newcastle-under-Lyme)\b)/g,'\n')}
 function parseSheet(text){text=tidy(text);const isEmail=/Call Information|Site Address\s*\n|Scheduled Arrival Date\/Time/i.test(text)&&!/Service Job Sheet|Job Number:|Site Name:|Serial No:/i.test(text);return isEmail?parseEmailText(text):parsePdfText(text)}
@@ -612,8 +676,10 @@ function loadSheetText(text,src){
   document.querySelectorAll('.found').forEach(e=>e.classList.remove('found'));
   let n=0;for(const[k,v]of Object.entries(r)){const el=document.querySelector('#form [data-k='+k+']');if(el&&v){el.value=v;el.classList.add('found');n++}}
   job.sheetText=text.slice(0,20000);
-  sheetMsg.innerHTML=n?`✅ Filled in <b>${n}</b> boxes${src?' from '+esc(src):''}. Check the yellow ones are right.`:'⚠️ Couldn\'t find the job details in that. Try the other way (PDF or paste), or type them in.';
+  sheetMsg.innerHTML=n?`✅ Filled in <b>${n}</b> boxes${src?' from '+esc(src):''}. Check the yellow ones are right.`:'⚠️ Couldn\'t find the job details in that. Try the other way (PDF or paste), or type them in.'+'<br><button class="btn alt" style="margin-top:6px;font-size:14px" onclick="showSheetText()">🔍 See the text the app received</button><div id="rawWrap" class="hidden" style="margin-top:6px"><textarea id="rawTxt" readonly style="min-height:160px;font-size:13px"></textarea><button class="btn alt" style="font-size:14px" onclick="copyRaw()">📋 Copy this text</button></div>';
   pasteBox.classList.add('hidden');pasteTxt.value='';growAll();saveJob(false)}
+function showSheetText(){const w=document.getElementById('rawWrap'),t=document.getElementById('rawTxt');if(!w)return;t.value=job.sheetText||'';w.classList.toggle('hidden')}
+function copyRaw(){const t=document.getElementById('rawTxt');if(!t)return;(navigator.clipboard?navigator.clipboard.writeText(t.value):Promise.reject()).then(()=>toast('Copied – paste it to Claude'),()=>{t.select();document.execCommand('copy');toast('Copied')})}
 let pdfjs=null;
 async function getPdfJs(){if(pdfjs)return pdfjs;globalThis.pdfjsWorker=await import(PDFJS_BASE+'pdf.worker.min.mjs');pdfjs=await import(PDFJS_BASE+'pdf.min.mjs');return pdfjs}
 sheetIn.onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;sheetMsg.textContent='Reading '+f.name+'…';
