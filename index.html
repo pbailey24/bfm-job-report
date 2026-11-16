@@ -504,14 +504,16 @@ function saveSettingsQuiet(){const s=S();document.querySelectorAll('[data-s]').f
 
 // sign in (Microsoft login page, then back here)
 async function odSignIn(){saveSettingsQuiet();
-  if(!odConfigured()){toast('Put the App (client) ID in Set-up first');return}
-  if(!window.crypto||!crypto.subtle){toast('Sign-in needs the https:// web address');return}
+  if(!odConfigured()){odMsg('⚠️ First paste the <b>App (client) ID</b> into “Set-up” below (from the Microsoft app registration), then tap Sign in again.');const d=document.querySelector('#settingsDlg details');if(d)d.open=true;return}
+  if(!window.crypto||!crypto.subtle){odMsg('⚠️ Sign-in only works from the https:// web address.');return}
+  odMsg('Opening the Microsoft sign-in page…');
   saveJob(false);
   const v=b64u(crypto.getRandomValues(new Uint8Array(48))),st=b64u(crypto.getRandomValues(new Uint8Array(16)));
   const ch=b64u(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v)));
   store.set('bfm_od_pkce',{v,st,r:odRedirect()});
   const q=new URLSearchParams({client_id:odCfg().id,response_type:'code',redirect_uri:odRedirect(),response_mode:'query',scope:OD_SCOPES,state:st,code_challenge:ch,code_challenge_method:'S256'});
   location.href=odAuthUrl('authorize')+'?'+q}
+function odMsg(h){const el=document.getElementById('odStatus');if(el&&settingsDlg.open)el.innerHTML=h;else toast(h.replace(/<[^>]+>/g,''))}
 function odSignOut(){store.set('bfm_od_tok',null);odShowStatus();toast('Signed out of OneDrive')}
 async function odTokenReq(body){
   const r=await fetch(odAuthUrl('token'),{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:odCfg().id,scope:OD_SCOPES,...body})});
